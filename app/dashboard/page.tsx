@@ -3,7 +3,7 @@ import { DashboardClient } from './dashboard-client';
 import { LoginForm } from './login-form';
 
 export default async function DashboardPage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();

@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { createServerComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from './types';
 
@@ -8,7 +7,9 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL and anon key must be provided. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+  throw new Error(
+    'Supabase URL and anon key must be provided. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+  );
 }
 
 export function createBrowserSupabaseClient() {
@@ -20,13 +21,15 @@ export function createBrowserSupabaseClient() {
   });
 }
 
-export function createServerSupabaseClient() {
+export async function createServerSupabaseClient() {
+  const { cookies } = await import('next/headers');
   return createServerComponentClient<Database>({
     cookies,
   });
 }
 
-export function createRouteSupabaseClient() {
+export async function createRouteSupabaseClient() {
+  const { cookies } = await import('next/headers');
   return createRouteHandlerClient<Database>({
     cookies,
   });
