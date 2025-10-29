@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import type { AuthSignInWithOAuthCredentials } from '@supabase/supabase-js';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
 
 export default function AuthPage() {
@@ -14,11 +15,16 @@ export default function AuthPage() {
     setAuthError(null);
     startTransition(async () => {
       const redirectTo = `${window.location.origin}/dashboard`;
+      const options: AuthSignInWithOAuthCredentials['options'] & {
+        forceRedirect: boolean;
+      } = {
+        redirectTo,
+        forceRedirect: true,
+      };
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo,
-        },
+        options,
       });
 
       if (error) {
