@@ -78,6 +78,7 @@ export default function HomePage() {
       setSlugError(null);
       setSlugAvailable(null);
       setSlugCheckError(false);
+      setIsCheckingSlug(false);
       return;
     }
 
@@ -85,6 +86,7 @@ export default function HomePage() {
       setSlugError('Custom slug may only contain letters, numbers, or hyphens (max 24 characters).');
       setSlugAvailable(null);
       setSlugCheckError(false);
+      setIsCheckingSlug(false);
       return;
     }
 
