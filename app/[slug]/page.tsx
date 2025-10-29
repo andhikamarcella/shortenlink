@@ -1,45 +1,46 @@
-import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { createServiceSupabaseClient } from '@/lib/supabase';
-import type { Database } from '@/lib/types';
+import { redirect, notFound } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-interface RedirectPageProps {
-  params: {
-    slug: string;
-  };
-}
+export default async function SlugPage({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export default async function RedirectPage({ params }: RedirectPageProps) {
-  const supabase = createServiceSupabaseClient();
-  const { data, error } = await supabase.from('links').select('*').eq('slug', params.slug).maybeSingle();
-
-  if (error) {
-    console.error('Error fetching slug', error);
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Supabase environment variables are not configured.');
   }
 
-  if (!data) {
-    return (
-      <section className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-6 px-4 text-center">
-        <h1 className="text-4xl font-semibold text-slate-900 dark:text-slate-100">Link not found</h1>
-        <p className="text-lg text-slate-600 dark:text-slate-300">
-          We couldn&apos;t find a link for <span className="font-semibold">{params.slug}</span>. It may have expired or been deleted.
-        </p>
-        <Link
-          href="/"
-          className="focus-ring inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-base font-semibold text-white shadow hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400"
-        >
-          Create your own link
-        </Link>
-      </section>
-    );
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+    },
+  });
+
+  const { data, error } = await supabase
+    .from('links')
+    .select('*')
+    .eq('slug', params.slug)
+    .maybeSingle();
+
+  if (error || !data) {
+    notFound();
   }
 
-  const updatePayload: Database['public']['Tables']['links']['Update'] = {
-    clicks: data.clicks + 1,
-  };
+  const newClicks = (data.clicks ?? 0) + 1;
 
-  await supabase.from('links').update(updatePayload).eq('id', data.id);
+  const { error: updateError } = await supabase
+    .from('links')
+    .update({ clicks: newClicks })
+    .eq('id', data.id);
+
+  if (updateError) {
+    notFound();
+  }
+
   redirect(data.original_url);
 }
