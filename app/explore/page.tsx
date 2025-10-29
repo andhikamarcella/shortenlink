@@ -1,60 +1,95 @@
-import { getSupabaseServerClient } from '@/lib/supabaseClientServer'
+'use client'
 
-export default async function ExplorePage() {
-  const supabase = getSupabaseServerClient()
+import { useEffect, useState } from 'react'
 
-  let links: { slug: string; url: string; created_at: string }[] | null = null
-  let fetchError: string | null = null
+import Navbar from '@/components/Navbar'
+import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
 
-  if (!supabase) {
-    fetchError = 'Supabase not configured'
-  } else {
-    const { data, error } = await supabase
-      .from('links')
-      .select('slug, url, created_at')
-      .order('created_at', { ascending: false })
-      .limit(20)
+type PublicLink = {
+  slug: string
+  url: string
+  created_at: string
+}
 
-    if (error) {
-      console.error('[explore] supabase error:', error)
-      fetchError = error.message ?? 'Unknown error'
-    } else {
-      links = data ?? []
+export default function ExplorePage() {
+  const [links, setLinks] = useState<PublicLink[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadLinks = async () => {
+      const { data, error } = await supabaseBrowser
+        .from('links')
+        .select('slug, url, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) {
+        console.error('[explore] failed to load links:', error.message)
+        setError('Unable to load public links right now.')
+      } else {
+        setLinks(data ?? [])
+      }
+
+      setLoading(false)
     }
-  }
+
+    void loadLinks()
+  }, [])
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? ''
 
   return (
-    <main className="min-h-screen bg-black text-white p-8">
-      <h1 className="text-2xl font-semibold mb-4">Explore</h1>
+    <div className="min-h-screen bg-black text-white">
+      <Navbar />
+      <main className="mx-auto w-full max-w-5xl px-6 py-10">
+        <h1 className="text-2xl font-semibold">Explore</h1>
+        <p className="mt-2 text-sm text-neutral-400">
+          Recently created links from the shortly community.
+        </p>
 
-      {fetchError && (
-        <p className="text-red-400 text-sm">Error loading links.</p>
-      )}
+        {loading && (
+          <div className="mt-6 text-sm text-neutral-400">Loading public links...</div>
+        )}
 
-      {!fetchError && links && links.length === 0 && (
-        <p className="text-neutral-500 text-sm">No links yet.</p>
-      )}
+        {!loading && error && (
+          <div className="mt-6 rounded border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
+            {error}
+          </div>
+        )}
 
-      {!fetchError && links && links.length > 0 && (
-        <ul className="space-y-3">
-          {links.map((row) => (
-            <li
-              key={row.slug}
-              className="rounded bg-neutral-800 p-4 flex flex-col"
-            >
-              <span className="font-mono text-sm text-purple-300">
-                /{row.slug}
-              </span>
-              <span className="text-sm text-neutral-300 break-all">
-                {row.url}
-              </span>
-              <span className="text-[10px] text-neutral-500">
-                {new Date(row.created_at).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+        {!loading && !error && links.length === 0 && (
+          <div className="mt-6 rounded border border-white/10 bg-white/5 p-6 text-sm text-neutral-300">
+            No public links yet.
+          </div>
+        )}
+
+        {!loading && !error && links.length > 0 && (
+          <ul className="mt-6 space-y-4">
+            {links.map((link) => (
+              <li
+                key={link.slug}
+                className="rounded border border-white/10 bg-white/5 p-4 text-sm text-neutral-100"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <a
+                    href={`${baseUrl}/${link.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-base text-purple-300 hover:underline"
+                  >
+                    {baseUrl ? `${baseUrl}/${link.slug}` : `/${link.slug}`}
+                  </a>
+                  <span className="text-xs text-neutral-400">
+                    {new Date(link.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="mt-2 break-all text-neutral-200">{link.url}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
+    </div>
   )
 }

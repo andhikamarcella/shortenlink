@@ -41,7 +41,7 @@ export default function AuthCallbackPage() {
       router.replace('/auth')
     }
 
-    void syncSession()
+    syncSession()
   }, [router])
 
   return (
