@@ -14,11 +14,9 @@ type FeedbackRow = {
   created_at: string
 }
 
-type FeedbackSession = {
-  user: {
-    id: string
-    email: string | null
-  }
+type SessionUser = {
+  id: string
+  email: string | null
 }
 
 const formatTimestamp = (iso: string) =>
@@ -31,14 +29,13 @@ const formatTimestamp = (iso: string) =>
     second: '2-digit',
   })
 
-const isModerator = (email: string | null) =>
-  email ? ['andhikamarcella546@gmail.com'].includes(email) : false
+const isModerator = (email: string | null | undefined) => email === 'andhikamarcella546@gmail.com'
 
 export default function FeedbackPage() {
   const router = useRouter()
-  const isMountedRef = useRef(true)
+  const mountedRef = useRef(true)
 
-  const [session, setSession] = useState<FeedbackSession | null>(null)
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null)
   const [modView, setModView] = useState(false)
   const [loadingSession, setLoadingSession] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(true)
@@ -48,42 +45,58 @@ export default function FeedbackPage() {
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
-    isMountedRef.current = true
+    mountedRef.current = true
 
-    const load = async () => {
+    const loadSession = async () => {
       setLoadingSession(true)
       const { data, error } = await supabaseBrowser.auth.getSession()
 
-      if (!isMountedRef.current) return
+      if (!mountedRef.current) return
 
       setLoadingSession(false)
 
       if (error || !data?.session) {
-        setSession(null)
-        setLoadingMessages(false)
         router.replace('/auth')
         return
       }
 
-      const currentSession: FeedbackSession = {
-        user: {
-          id: data.session.user.id,
-          email: data.session.user.email ?? null,
-        },
+      const currentUser: SessionUser = {
+        id: data.session.user.id,
+        email: data.session.user.email ?? null,
       }
 
-      setSession(currentSession)
-      const moderator = isModerator(currentSession.user.email)
+      setSessionUser(currentUser)
+      const moderator = isModerator(currentUser.email)
       setModView(moderator)
-      void fetchMessages(currentSession.user.id, moderator)
+      void fetchMessages(currentUser.id, moderator)
     }
 
-    void load()
+    const { data: authListener } = supabaseBrowser.auth.onAuthStateChange((event, data) => {
+      if (!mountedRef.current) return
+      if (event === 'SIGNED_OUT') {
+        setSessionUser(null)
+        router.replace('/auth')
+        return
+      }
+
+      if (data?.user) {
+        const nextUser: SessionUser = {
+          id: data.user.id,
+          email: data.user.email ?? null,
+        }
+        setSessionUser(nextUser)
+        const moderator = isModerator(nextUser.email)
+        setModView(moderator)
+        void fetchMessages(nextUser.id, moderator)
+      }
+    })
+
+    void loadSession()
 
     return () => {
-      isMountedRef.current = false
+      mountedRef.current = false
+      authListener?.subscription.unsubscribe()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
   const fetchMessages = async (userId: string, moderator: boolean) => {
@@ -101,7 +114,7 @@ export default function FeedbackPage() {
 
     const { data, error } = await query
 
-    if (!isMountedRef.current) return
+    if (!mountedRef.current) return
 
     if (error) {
       console.error('[feedback] failed to load messages:', error.message)
@@ -118,7 +131,7 @@ export default function FeedbackPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!session) {
+    if (!sessionUser) {
       router.replace('/auth')
       return
     }
@@ -131,8 +144,8 @@ export default function FeedbackPage() {
     setSending(true)
 
     const { error } = await supabaseBrowser.from('feedback').insert({
-      user_id: session.user.id,
-      email: session.user.email,
+      user_id: sessionUser.id,
+      email: sessionUser.email,
       message: trimmed,
     })
 
@@ -144,20 +157,19 @@ export default function FeedbackPage() {
 
     setMessageText('')
     setSending(false)
-    void fetchMessages(session.user.id, modView)
+    void fetchMessages(sessionUser.id, modView)
   }
 
   const isLoading = loadingSession || loadingMessages
-  const hasSession = !!session
 
   return (
-    <div className="bg-[#0d1326] min-h-screen text-white">
+    <div className="min-h-screen bg-[#0d1326] text-white">
       <Navbar />
       <main>
-        <section className="mx-auto max-w-3xl py-10 px-4">
+        <section className="mx-auto max-w-4xl px-4 py-16">
           <header className="mb-8">
             <div className="flex flex-wrap items-start gap-2">
-              <h1 className="flex items-center text-2xl font-semibold text-white">
+              <h1 className="flex items-center text-3xl font-semibold text-white">
                 Feedback
                 {modView && (
                   <span className="ml-2 rounded-md border border-pink-500/40 bg-pink-600/30 px-2 py-1 text-[10px] font-medium text-pink-300">
@@ -165,9 +177,6 @@ export default function FeedbackPage() {
                   </span>
                 )}
               </h1>
-              {!hasSession && !isLoading && (
-                <span className="text-xs text-white/50">Redirecting to sign in…</span>
-              )}
             </div>
             <p className="text-sm text-white/60">Send us bugs, ideas, and suggestions. Thank you 💜</p>
           </header>
@@ -175,7 +184,7 @@ export default function FeedbackPage() {
           {isLoading ? (
             <p className="mb-6 text-sm text-white/50">Loading feedback...</p>
           ) : error ? (
-            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">{error}</div>
+            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>
           ) : (
             <>
               <div className="mb-6 flex max-h-[400px] flex-col gap-4 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/90 backdrop-blur-sm">
@@ -201,14 +210,14 @@ export default function FeedbackPage() {
 
               <form
                 onSubmit={handleSubmit}
-                className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm"
+                className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/90 backdrop-blur-sm"
               >
                 <label className="text-sm font-medium text-white/80" htmlFor="feedback-message">
                   Your message
                 </label>
                 <textarea
                   id="feedback-message"
-                  className="w-full rounded-md border border-white/20 bg-black/40 p-2 text-sm text-white outline-none focus:border-indigo-500"
+                  className="w-full rounded-md border border-white/20 bg-black/40 p-2 text-sm text-white outline-none transition focus:border-indigo-500"
                   placeholder="Tell us what’s broken, what you love, or what feature you want next..."
                   value={messageText}
                   onChange={(event) => setMessageText(event.target.value)}
@@ -226,6 +235,8 @@ export default function FeedbackPage() {
               </form>
             </>
           )}
+
+          <p className="mt-12 text-right text-xs text-white/40">shortly · version 1.0 alpha</p>
         </section>
       </main>
     </div>

@@ -1,11 +1,29 @@
 import { createClient } from '@supabase/supabase-js'
 
-export function getSupabaseServerClient() {
+type ServerClientOptions = {
+  admin?: boolean
+}
+
+export function getSupabaseServerClient(options: ServerClientOptions = {}) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!url || !anon) {
-    console.error('[supabase] missing env NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  if (!url) {
+    console.error('[supabase] missing env NEXT_PUBLIC_SUPABASE_URL')
+    return null
+  }
+
+  if (options.admin) {
+    if (!serviceRole) {
+      console.warn('[supabase] service role key not available, falling back to anon key')
+    } else {
+      return createClient(url, serviceRole)
+    }
+  }
+
+  if (!anon) {
+    console.error('[supabase] missing env NEXT_PUBLIC_SUPABASE_ANON_KEY')
     return null
   }
 

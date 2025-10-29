@@ -16,22 +16,23 @@ export default function Navbar() {
     let isMounted = true
 
     const loadSession = async () => {
+      setLoadingSession(true)
       const { data } = await supabaseBrowser.auth.getSession()
       if (!isMounted) return
       setSession(data.session ?? null)
       setLoadingSession(false)
     }
 
-    const { data: authListener } = supabaseBrowser.auth.onAuthStateChange((_, eventSession) => {
+    const { data: subscription } = supabaseBrowser.auth.onAuthStateChange((_, currentSession) => {
       if (!isMounted) return
-      setSession(eventSession)
+      setSession(currentSession)
     })
 
     void loadSession()
 
     return () => {
       isMounted = false
-      authListener?.subscription.unsubscribe()
+      subscription?.subscription.unsubscribe()
     }
   }, [])
 
@@ -43,7 +44,7 @@ export default function Navbar() {
 
     const { error } = await supabaseBrowser.auth.signOut()
     if (error) {
-      console.error('[navbar] sign out failed:', error.message)
+      console.error('[navbar] failed to sign out:', error.message)
       setSigningOut(false)
       return
     }
@@ -53,8 +54,8 @@ export default function Navbar() {
   }
 
   return (
-    <header className="bg-[#0d1326]/80 backdrop-blur-sm border-b border-white/10 text-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+    <header className="border-b border-white/10 bg-[#0d1326]/80 text-white backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-6">
           <Link href="/" className="text-lg font-semibold text-white">
             shortly
@@ -74,7 +75,7 @@ export default function Navbar() {
           )}
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-white/50">
+        <div className="flex items-center gap-4 text-xs text-white/60">
           <span className="hidden select-none sm:inline-block">Version 1.0 alpha</span>
           {isLoggedIn && !loadingSession && (
             <button

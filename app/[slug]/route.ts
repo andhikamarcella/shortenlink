@@ -12,10 +12,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
 
   const supabase = getSupabaseServerClient()
   if (!supabase) {
-    return NextResponse.json(
-      { error: 'Supabase not configured' },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   }
 
   const { data, error } = await supabase
@@ -26,14 +23,25 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
 
   if (error && error.code !== 'PGRST116') {
     console.error('[redirect] failed to look up slug:', error)
-    return NextResponse.json(
-      { error: 'Failed to look up slug' },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Failed to look up slug' }, { status: 500 })
   }
 
   if (!data?.url) {
     return new Response('Not found', { status: 404 })
+  }
+
+  const country = req.headers.get('x-vercel-ip-country') || 'Unknown'
+  const adminClient = getSupabaseServerClient({ admin: true })
+
+  if (adminClient) {
+    const { error: clickError } = await adminClient.from('clicks').insert({
+      slug,
+      country,
+    })
+
+    if (clickError) {
+      console.error('[redirect] failed to record click:', clickError.message)
+    }
   }
 
   return NextResponse.redirect(data.url, { status: 302 })
