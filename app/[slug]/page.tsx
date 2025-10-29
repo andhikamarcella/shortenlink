@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createServiceSupabaseClient } from '@/lib/supabase';
+import type { Database } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +20,11 @@ export default async function RedirectPage({ params }: RedirectPageProps) {
   }
 
   if (data) {
-    await supabase
-      .from('links')
-      .update({ clicks: data.clicks + 1 })
-      .eq('id', data.id);
+    const updatePayload: Database['public']['Tables']['links']['Update'] = {
+      clicks: data.clicks + 1,
+    };
+
+    await supabase.from('links').update(updatePayload).eq('id', data.id);
 
     redirect(data.original_url);
   }
