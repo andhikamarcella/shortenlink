@@ -21,7 +21,7 @@ export default async function StatsPage({
 
   const { data, error } = await supabase
     .from('links')
-    .select('slug, url, clicks, created_at')
+    .select('slug, destination_url, clicks_count, created_at')
     .eq('slug', params.slug)
     .maybeSingle();
 
@@ -35,9 +35,9 @@ export default async function StatsPage({
     'https://shortly.example.com';
 
   const shortUrl = `${origin.replace(/\/$/, '')}/${data.slug}`;
-  const domain = getHostname(data.url);
+  const domain = getHostname(data.destination_url);
   const createdAt = new Date(data.created_at).toLocaleString();
-  const baseline = Math.max(1, data.clicks || 1);
+  const baseline = Math.max(1, data.clicks_count || 1);
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 space-y-6">
@@ -47,7 +47,7 @@ export default async function StatsPage({
       <p>
         <strong>Original URL:</strong>{' '}
         <a
-          href={data.url}
+          href={data.destination_url}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-500 underline"
@@ -59,7 +59,7 @@ export default async function StatsPage({
         <strong>Short URL:</strong> <code>{shortUrl}</code>
       </p>
       <p>
-        <strong>Clicks:</strong> {data.clicks ?? 0}
+        <strong>Clicks:</strong> {data.clicks_count ?? 0}
       </p>
       <p>
         <strong>Created At:</strong> {createdAt}

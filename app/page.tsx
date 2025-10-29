@@ -173,9 +173,9 @@ export default function HomePage() {
         }
       }
 
-      const payload: { slug: string; url: string; user_id?: string | null } = {
+      const payload: { slug: string; destination_url: string; user_id?: string | null } = {
         slug: slugToUse,
-        url: sanitizedUrl,
+        destination_url: sanitizedUrl,
       };
 
       if (userId) {
@@ -188,9 +188,9 @@ export default function HomePage() {
         body: JSON.stringify(payload),
       });
 
-      let body: { success?: boolean; error?: string } = {};
+      let body: { success?: boolean; error?: string; slug?: string } = {};
       try {
-        body = (await response.json()) as { success?: boolean; error?: string };
+        body = (await response.json()) as { success?: boolean; error?: string; slug?: string };
       } catch {
         body = {};
       }
@@ -207,9 +207,10 @@ export default function HomePage() {
       }
 
       const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin).replace(/\/$/, '');
-      const shortUrl = `${baseUrl}/${slugToUse}`;
+      const finalSlug = body.slug ?? slugToUse;
+      const shortUrl = `${baseUrl}/${finalSlug}`;
 
-      setResult({ shortUrl, slug: slugToUse, url: sanitizedUrl });
+      setResult({ shortUrl, slug: finalSlug, url: sanitizedUrl });
       setStatusMessage('Success! Your link is ready.');
       setSlugAvailable(null);
       setSlugCheckError(false);
