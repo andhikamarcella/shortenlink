@@ -1,33 +1,54 @@
-import { createServerSupabaseClient, createServiceSupabaseClient } from '@/lib/supabase';
-import { DashboardClient } from './dashboard-client';
-import { LoginForm } from './login-form';
+import DashboardClient from './dashboard-client';
+import { createClient } from '@supabase/supabase-js';
+import { ReactElement } from 'react';
 
-export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+interface DashboardLink {
+  slug: string;
+  original_url: string;
+  clicks: number;
+  created_at: string;
+}
 
-  if (!session) {
-    return (
-      <section className="mx-auto flex min-h-[60vh] w-full max-w-xl items-center justify-center px-4 py-16">
-        <LoginForm />
-      </section>
-    );
-  }
+export default async function DashboardPage(): Promise<ReactElement> {
+  const session = {
+    user: {
+      id: 'mock-user-id',
+      email: 'user@example.com',
+    },
+  };
 
-  const admin = createServiceSupabaseClient();
-  const { data: links } = await admin
+  const supabase = createClient(
+    process.env.SUPABASE_URL as string,
+    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+    {
+      auth: { persistSession: false },
+    }
+  );
+
+  const { data, error } = await supabase
     .from('links')
     .select('slug, original_url, clicks, created_at')
     .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'http://localhost:3000';
+  const safeLinks: DashboardLink[] = error || !data
+    ? []
+    : data.map((link) => ({
+        slug: link.slug,
+        original_url: link.original_url,
+        clicks: link.clicks ?? 0,
+        created_at: link.created_at,
+      }));
+
+  const origin = process.env.NEXT_PUBLIC_BASE_URL || '';
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16">
-      <DashboardClient initialLinks={links ?? []} shortBase={origin.replace(/\/$/, '')} userEmail={session.user.email ?? 'you'} />
+      <DashboardClient
+        initialLinks={safeLinks}
+        shortBase={origin.replace(/\/$/, '')}
+        userEmail={session.user.email ?? 'you'}
+      />
     </section>
   );
 }

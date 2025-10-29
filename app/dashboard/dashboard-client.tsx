@@ -18,7 +18,7 @@ type QRCodeModule = {
   toDataURL: (text: string, options?: { margin?: number; width?: number }) => Promise<string>;
 };
 
-export function DashboardClient({ initialLinks, shortBase, userEmail }: DashboardClientProps) {
+function DashboardClient({ initialLinks, shortBase, userEmail }: DashboardClientProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [sort, setSort] = useState<SortOption>('newest');
   const [links, setLinks] = useState(initialLinks);
@@ -221,3 +221,5 @@ export function DashboardClient({ initialLinks, shortBase, userEmail }: Dashboar
     </div>
   );
 }
+
+export default DashboardClient;
