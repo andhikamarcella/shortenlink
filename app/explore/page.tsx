@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { createServiceSupabaseClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { StatCard } from '@/components/StatCard';
 
 export const revalidate = 15;
@@ -18,25 +18,65 @@ function getHostname(url: string) {
   }
 }
 
+type LinkSummary = {
+  slug: string;
+  original_url: string;
+  clicks: number;
+  created_at: string;
+};
+
 export default async function ExplorePage() {
-  const supabase = createServiceSupabaseClient();
-  const [{ data: popularLinks }, { data: latestLinks }, { count }] = await Promise.all([
+  const supabase = createClient(
+    process.env.SUPABASE_URL as string,
+    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+    { auth: { persistSession: false } }
+  );
+
+  const [popularResult, latestResult, countResult] = await Promise.all([
     supabase
       .from('links')
       .select('slug, original_url, clicks, created_at')
       .eq('is_public', true)
       .order('clicks', { ascending: false })
-      .limit(12),
+      .limit(10),
     supabase
       .from('links')
       .select('slug, original_url, clicks, created_at')
       .eq('is_public', true)
       .order('created_at', { ascending: false })
-      .limit(12),
-    supabase.from('links').select('*', { count: 'exact', head: true }).eq('is_public', true),
+      .limit(10),
+    supabase
+      .from('links')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_public', true),
   ]);
 
-  const totalClicks = (popularLinks || []).reduce((acc, link) => acc + link.clicks, 0);
+  const safePopularLinks: LinkSummary[] =
+    popularResult.error || !popularResult.data
+      ? []
+      : popularResult.data.map((link) => ({
+          slug: link.slug,
+          original_url: link.original_url,
+          clicks: link.clicks ?? 0,
+          created_at: link.created_at,
+        }));
+
+  const safeLatestLinks: LinkSummary[] =
+    latestResult.error || !latestResult.data
+      ? []
+      : latestResult.data.map((link) => ({
+          slug: link.slug,
+          original_url: link.original_url,
+          clicks: link.clicks ?? 0,
+          created_at: link.created_at,
+        }));
+
+  const publicCount =
+    countResult.error || typeof countResult.count !== 'number'
+      ? 0
+      : countResult.count;
+
+  const totalClicks = safePopularLinks.reduce((acc, link) => acc + link.clicks, 0);
 
   return (
     <section className="mx-auto w-full max-w-5xl space-y-12 px-4 py-16">
@@ -48,16 +88,19 @@ export default async function ExplorePage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Public links" value={count ?? 0} />
-        <StatCard label="Total clicks (top 12)" value={totalClicks} />
+        <StatCard label="Public links" value={publicCount} />
+        <StatCard label="Total clicks (top 10)" value={totalClicks} />
       </div>
 
       <div className="grid gap-12 md:grid-cols-2">
         <div className="space-y-4">
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Popular links</h2>
           <ul className="space-y-3">
-            {(popularLinks || []).map((link) => (
-              <li key={`popular-${link.slug}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+            {safePopularLinks.map((link) => (
+              <li
+                key={`popular-${link.slug}`}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">/{link.slug}</p>
@@ -82,8 +125,11 @@ export default async function ExplorePage() {
         <div className="space-y-4">
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Latest links</h2>
           <ul className="space-y-3">
-            {(latestLinks || []).map((link) => (
-              <li key={`latest-${link.slug}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+            {safeLatestLinks.map((link) => (
+              <li
+                key={`latest-${link.slug}`}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">/{link.slug}</p>
