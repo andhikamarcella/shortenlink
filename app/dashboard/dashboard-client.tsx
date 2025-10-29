@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/Button';
 import { LinkRow, LinkRecord } from '@/components/LinkRow';
-import { createBrowserSupabaseClient } from '@/lib/supabase';
+import { supabaseClient } from '@/lib/supabaseClient';
 
 interface DashboardClientProps {
   initialLinks: Array<{ slug: string; original_url: string; clicks: number; created_at: string }>;
@@ -19,7 +19,7 @@ type QRCodeModule = {
 };
 
 function DashboardClient({ initialLinks, shortBase, userEmail }: DashboardClientProps) {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = supabaseClient;
   const [sort, setSort] = useState<SortOption>('newest');
   const [links, setLinks] = useState(initialLinks);
   const [status, setStatus] = useState('');
