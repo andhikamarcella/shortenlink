@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AuthSignInWithOAuthCredentials } from '@supabase/supabase-js';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
 
 export default function AuthPage() {
@@ -15,16 +14,12 @@ export default function AuthPage() {
     setAuthError(null);
     startTransition(async () => {
       const redirectTo = `${window.location.origin}/dashboard`;
-      const options: AuthSignInWithOAuthCredentials['options'] & {
-        forceRedirect: boolean;
-      } = {
-        redirectTo,
-        forceRedirect: true,
-      };
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options,
+        options: {
+          redirectTo,
+          forceRedirect: true,
+        },
       });
 
       if (error) {
@@ -46,10 +41,7 @@ export default function AuthPage() {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={isPending}
-          className={[
-            'mt-6 w-full rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-          ].join(' ')}
+          className="mt-6 w-full rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending ? 'Redirecting...' : 'Continue with Google'}
         </button>

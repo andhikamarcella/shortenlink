@@ -3,21 +3,9 @@ import { cookies } from 'next/headers';
 import { randomBytes } from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabase';
 
-const slugRegex = /^[a-z0-9-]{1,24}$/;
+const slugPattern = /^[a-z0-9-]{1,24}$/;
 
-function generateRandomSlug(length = 6): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const entropy = randomBytes(length);
-  let result = '';
-
-  for (let index = 0; index < length; index += 1) {
-    result += alphabet[entropy[index] % alphabet.length];
-  }
-
-  return result;
-}
-
-function sanitizeHttpUrl(value: string): string | null {
+function sanitizeUrl(value: string): string | null {
   try {
     const parsed = new URL(value.trim());
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -27,6 +15,18 @@ function sanitizeHttpUrl(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+function generateRandomSlug(length = 7): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = randomBytes(length);
+  let output = '';
+
+  for (let index = 0; index < length; index += 1) {
+    output += alphabet[bytes[index] % alphabet.length];
+  }
+
+  return output;
 }
 
 function getProjectRef(): string | null {
@@ -44,7 +44,12 @@ function getProjectRef(): string | null {
   }
 }
 
-function extractAccessTokenFromCookies(): string | null {
+function extractAccessToken(request: Request): string | null {
+  const headerToken = request.headers.get('authorization') ?? request.headers.get('Authorization');
+  if (headerToken?.startsWith('Bearer ')) {
+    return headerToken.slice(7).trim();
+  }
+
   const store = cookies();
   const direct = store.get('sb-access-token')?.value;
   if (direct) {
@@ -56,9 +61,9 @@ function extractAccessTokenFromCookies(): string | null {
     return null;
   }
 
-  const prefixedAccess = store.get(`sb-${projectRef}-access-token`)?.value;
-  if (prefixedAccess) {
-    return prefixedAccess;
+  const prefixed = store.get(`sb-${projectRef}-access-token`)?.value;
+  if (prefixed) {
+    return prefixed;
   }
 
   const authCookie = store.get(`sb-${projectRef}-auth-token`)?.value;
@@ -77,35 +82,9 @@ function extractAccessTokenFromCookies(): string | null {
   return null;
 }
 
-async function resolveUserId(
-  supabase: ReturnType<typeof createServerSupabaseClient>,
-  request: Request
-): Promise<string | null> {
-  const authHeader = request.headers.get('authorization') ?? request.headers.get('Authorization');
-  let accessToken: string | null = null;
-
-  if (authHeader?.startsWith('Bearer ')) {
-    accessToken = authHeader.slice(7).trim();
-  }
-
-  if (!accessToken) {
-    accessToken = extractAccessTokenFromCookies();
-  }
-
-  if (!accessToken) {
-    return null;
-  }
-
-  const { data, error } = await supabase.auth.getUser(accessToken);
-  if (error || !data?.user) {
-    return null;
-  }
-
-  return data.user.id;
-}
-
 export async function POST(request: Request) {
   let payload: unknown;
+
   try {
     payload = await request.json();
   } catch {
@@ -123,43 +102,42 @@ export async function POST(request: Request) {
     custom_slug?: unknown;
   };
 
-  const rawUrlInput =
+  const rawUrl =
     typeof body.url === 'string'
       ? body.url.trim()
       : typeof body.original_url === 'string'
       ? body.original_url.trim()
       : '';
 
-  if (!rawUrlInput) {
+  if (!rawUrl) {
     return NextResponse.json({ error: 'URL is required' }, { status: 400 });
   }
 
-  const sanitizedUrl = sanitizeHttpUrl(rawUrlInput);
+  const sanitizedUrl = sanitizeUrl(rawUrl);
   if (!sanitizedUrl) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
   }
 
-  const providedSlug =
+  const requestedSlug =
     typeof body.slug === 'string'
-      ? body.slug.trim()
+      ? body.slug.trim().toLowerCase()
       : typeof body.custom_slug === 'string'
-      ? body.custom_slug.trim()
+      ? body.custom_slug.trim().toLowerCase()
       : '';
 
   const supabase = createServerSupabaseClient();
 
   let finalSlug: string | null = null;
 
-  if (providedSlug) {
-    const normalized = providedSlug.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    if (!normalized || !slugRegex.test(normalized)) {
+  if (requestedSlug) {
+    if (!slugPattern.test(requestedSlug)) {
       return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
     }
 
     const { data: existing, error: lookupError } = await supabase
       .from('links')
       .select('id')
-      .eq('slug', normalized)
+      .eq('slug', requestedSlug)
       .maybeSingle();
 
     if (lookupError) {
@@ -170,22 +148,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Slug already exists' }, { status: 400 });
     }
 
-    finalSlug = normalized;
+    finalSlug = requestedSlug;
   } else {
-    const maxAttempts = 8;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       const candidate = generateRandomSlug();
-      const { data: existing, error: lookupError } = await supabase
+      const { data: collision, error: collisionError } = await supabase
         .from('links')
         .select('id')
         .eq('slug', candidate)
         .maybeSingle();
 
-      if (lookupError) {
+      if (collisionError) {
         return NextResponse.json({ error: 'Failed to generate slug' }, { status: 500 });
       }
 
-      if (!existing) {
+      if (!collision) {
         finalSlug = candidate;
         break;
       }
@@ -196,13 +173,26 @@ export async function POST(request: Request) {
     }
   }
 
-  const userId = await resolveUserId(supabase, request);
+  const accessToken = extractAccessToken(request);
+  let userId: string | null = null;
+
+  if (accessToken) {
+    const { data: userData } = await supabase.auth.getUser(accessToken);
+    if (userData?.user) {
+      userId = userData.user.id;
+    }
+  }
+
+  const slugToUse = finalSlug;
+  if (!slugToUse) {
+    return NextResponse.json({ error: 'Failed to generate slug' }, { status: 500 });
+  }
 
   const { data: inserted, error: insertError } = await supabase
     .from('links')
     .insert([
       {
-        slug: finalSlug,
+        slug: slugToUse,
         original_url: sanitizedUrl,
         user_id: userId,
         is_public: true,
@@ -216,22 +206,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create short link' }, { status: 500 });
   }
 
-  const fallbackBase = 'https://shortenlink-snowy.vercel.app';
-  const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.SITE_URL ??
-    vercelUrl ??
-    request.headers.get('origin') ??
-    fallbackBase;
-  const normalizedBase = baseUrl.replace(/\/$/, '');
-  const shortUrl = `${normalizedBase}/${inserted.slug}`;
+  const baseOrigin =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    'https://shortenlink-snowy.vercel.app';
+
+  const shortBase = baseOrigin.replace(/\/$/, '');
 
   return NextResponse.json(
     {
       slug: inserted.slug,
-      shortUrl,
+      shortUrl: `${shortBase}/${inserted.slug}`,
       clicks: inserted.clicks ?? 0,
       created_at: inserted.created_at,
     },
