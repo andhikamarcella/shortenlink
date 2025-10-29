@@ -26,7 +26,11 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     return NextResponse.json({ error: 'Failed to look up slug' }, { status: 500 });
   }
 
-  const destination = data?.destination_url ?? data?.url ?? null;
+  if (!data) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  const destination = data.destination_url ?? data.url ?? null;
 
   if (!destination) {
     return new Response('Not found', { status: 404 });
