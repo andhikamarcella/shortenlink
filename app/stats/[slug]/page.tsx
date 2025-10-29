@@ -15,10 +15,13 @@ export default async function StatsPage({
   params: { slug: string };
 }) {
   const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
 
   const { data, error } = await supabase
     .from('links')
-    .select('slug, original_url, clicks, created_at')
+    .select('slug, url, clicks, created_at')
     .eq('slug', params.slug)
     .maybeSingle();
 
@@ -32,7 +35,7 @@ export default async function StatsPage({
     'https://shortly.example.com';
 
   const shortUrl = `${origin.replace(/\/$/, '')}/${data.slug}`;
-  const domain = getHostname(data.original_url);
+  const domain = getHostname(data.url);
   const createdAt = new Date(data.created_at).toLocaleString();
   const baseline = Math.max(1, data.clicks || 1);
 
@@ -44,7 +47,7 @@ export default async function StatsPage({
       <p>
         <strong>Original URL:</strong>{' '}
         <a
-          href={data.original_url}
+          href={data.url}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-500 underline"

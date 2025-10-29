@@ -8,6 +8,9 @@ export async function DELETE(
   const { slug } = context.params;
 
   const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ message: 'Supabase not configured' }, { status: 500 });
+  }
 
   const user = null as { id: string } | null;
 

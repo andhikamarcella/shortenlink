@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from '@/lib/supabaseClientServer';
 
 interface DashboardLink {
   slug: string;
-  original_url: string;
+  url: string;
   clicks: number;
   created_at: string;
 }
@@ -66,6 +66,9 @@ export default async function DashboardPage() {
   }
 
   const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
 
   const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
   if (userError || !userData?.user) {
@@ -76,14 +79,14 @@ export default async function DashboardPage() {
 
   const { data, error } = await supabase
     .from('links')
-    .select('slug, original_url, clicks, created_at')
+    .select('slug, url, clicks, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   const safeLinks: DashboardLink[] = !error && data
     ? data.map((link) => ({
         slug: link.slug,
-        original_url: link.original_url,
+        url: link.url,
         clicks: link.clicks ?? 0,
         created_at: link.created_at,
       }))

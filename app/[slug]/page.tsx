@@ -7,10 +7,13 @@ export default async function SlugPage({
   params: { slug: string };
 }) {
   const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
 
   const { data, error } = await supabase
     .from('links')
-    .select('*')
+    .select('id, slug, url, clicks')
     .eq('slug', params.slug)
     .maybeSingle();
 
@@ -25,5 +28,5 @@ export default async function SlugPage({
     .update({ clicks: newClicks })
     .eq('id', data.id);
 
-  redirect(data.original_url);
+  redirect(data.url);
 }

@@ -6,26 +6,22 @@ import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
-  const supabase = supabaseBrowser
 
   useEffect(() => {
     const run = async () => {
-      const { data } = await supabase.auth.getSession()
-      const session = data.session
-
-      if (session) {
+      const { data } = await supabaseBrowser.auth.getSession()
+      if (data.session) {
         router.replace('/dashboard')
       } else {
-        router.replace('/auth?error=NoSession')
+        router.replace('/auth?error=no-session')
       }
     }
-
     void run()
-  }, [router, supabase])
+  }, [router])
 
   return (
-    <main className="flex min-h-screen items-center justify-center text-white">
-      <p>Signing you in…</p>
+    <main className="flex min-h-screen items-center justify-center bg-black text-white">
+      <p>Signing you in...</p>
     </main>
   )
 }

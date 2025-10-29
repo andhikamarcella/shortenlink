@@ -1,13 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
 export function getSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('[Supabase Setup Error] Missing env NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
-    throw new Error('Supabase environment variables are not set')
+  if (!url || !anon) {
+    console.error('[supabase] missing env NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    return null
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey)
+  return createClient(url, anon)
 }

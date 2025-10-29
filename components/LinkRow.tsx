@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 
 export interface LinkRecord {
   slug: string;
-  original_url: string;
+  url: string;
   clicks: number;
   created_at: string;
   shortUrl: string;
@@ -48,8 +48,8 @@ export function LinkRow({ link, onCopy, onDelete, qrGenerator }: LinkRowProps) {
             {link.clicks} clicks
           </span>
         </div>
-        <p className="line-clamp-2 break-all text-sm text-slate-600 dark:text-slate-300" title={link.original_url}>
-          {link.original_url}
+        <p className="line-clamp-2 break-all text-sm text-slate-600 dark:text-slate-300" title={link.url}>
+          {link.url}
         </p>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Created {format(new Date(link.created_at), 'PPP p')}

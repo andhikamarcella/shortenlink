@@ -7,7 +7,7 @@ import { LinkRow, LinkRecord } from '@/components/LinkRow';
 import { supabaseBrowser } from '@/lib/supabaseClientBrowser';
 
 interface DashboardClientProps {
-  initialLinks: Array<{ slug: string; original_url: string; clicks: number; created_at: string }>;
+  initialLinks: Array<{ slug: string; url: string; clicks: number; created_at: string }>;
   shortBase: string;
   userEmail: string;
 }
@@ -148,8 +148,8 @@ function DashboardClient({ initialLinks, shortBase, userEmail }: DashboardClient
                 <tr key={link.slug} className="text-sm text-slate-700 dark:text-slate-200">
                   <td className="px-6 py-4 font-semibold">/{link.slug}</td>
                   <td className="px-6 py-4">
-                    <span className="line-clamp-1" title={link.original_url}>
-                      {link.original_url}
+                    <span className="line-clamp-1" title={link.url}>
+                      {link.url}
                     </span>
                   </td>
                   <td className="px-6 py-4">{link.clicks}</td>

@@ -14,6 +14,12 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { available: false, message: 'Supabase not configured' },
+      { status: 500 }
+    );
+  }
 
   const { data, error } = await supabase
     .from('links')

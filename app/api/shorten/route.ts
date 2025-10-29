@@ -39,6 +39,10 @@ function getAccessToken(request: Request): string | null {
 
 export async function POST(request: Request) {
   const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ message: 'Supabase not configured' }, { status: 500 });
+  }
+
   let body: unknown;
 
   try {
@@ -51,16 +55,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
   }
 
-  const { original_url, custom_slug } = body as {
-    original_url?: unknown;
+  const { url, custom_slug } = body as {
+    url?: unknown;
     custom_slug?: unknown;
   };
 
-  if (typeof original_url !== 'string' || original_url.trim().length === 0) {
+  if (typeof url !== 'string' || url.trim().length === 0) {
     return NextResponse.json({ message: 'Invalid URL' }, { status: 400 });
   }
 
-  const sanitizedUrl = normalizeUrl(original_url);
+  const sanitizedUrl = normalizeUrl(url);
   if (!sanitizedUrl) {
     return NextResponse.json({ message: 'Invalid URL' }, { status: 400 });
   }
@@ -133,13 +137,13 @@ export async function POST(request: Request) {
     .insert([
       {
         slug: slugToUse,
-        original_url: sanitizedUrl,
+        url: sanitizedUrl,
         user_id: userId,
         clicks: 0,
         is_public: true,
       },
     ])
-    .select('slug, clicks, created_at')
+    .select('slug, clicks, created_at, url')
     .single();
 
   if (insertError || !inserted) {
@@ -160,6 +164,7 @@ export async function POST(request: Request) {
       shortUrl: `${shortBase}/${inserted.slug}`,
       clicks: inserted.clicks ?? 0,
       created_at: inserted.created_at,
+      url: inserted.url,
     },
     { status: 201 }
   );

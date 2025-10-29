@@ -28,7 +28,7 @@ create table if not exists public.links (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete set null,
   slug text unique not null,
-  original_url text not null,
+  url text not null,
   clicks integer not null default 0,
   created_at timestamptz not null default timezone('utc', now()),
   is_public boolean not null default true

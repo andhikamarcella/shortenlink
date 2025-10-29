@@ -5,30 +5,30 @@ import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false)
-  const supabase = supabaseBrowser
 
   const handleLogin = async () => {
     setLoading(true)
-
-    const redirectBase = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
-    const { error } = await supabase.auth.signInWithOAuth({
+    const redirectTo = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`
+    const { error } = await supabaseBrowser.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${redirectBase}/auth/callback`,
+        redirectTo,
       },
     })
 
     if (error) {
-      console.error('OAuth error:', error.message)
+      console.error('[auth] OAuth error:', error.message)
       setLoading(false)
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="rounded-md bg-neutral-900 p-6 text-white shadow">
+    <main className="flex min-h-screen items-center justify-center bg-[#0d1326] text-white">
+      <div className="rounded-lg bg-black/60 p-6 text-center shadow">
         <h1 className="mb-4 text-xl font-semibold">Sign in</h1>
-        <p className="mb-6 text-sm text-neutral-400">Use Google to access your dashboard.</p>
+        <p className="mb-6 text-sm text-neutral-400">
+          Use Google to access your dashboard.
+        </p>
         <button
           onClick={handleLogin}
           disabled={loading}

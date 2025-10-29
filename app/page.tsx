@@ -11,6 +11,7 @@ import { supabaseBrowser } from '@/lib/supabaseClientBrowser';
 interface ShortenResponse {
   shortUrl: string;
   slug: string;
+  url?: string;
 }
 
 interface SlugAvailabilityResult {
@@ -144,7 +145,7 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          original_url: sanitizedUrl,
+          url: sanitizedUrl,
           custom_slug: customSlug || undefined,
           is_public: true,
           user_id: userId ?? undefined,
@@ -197,12 +198,12 @@ export default function HomePage() {
         aria-busy={isLoading}
       >
         <div>
-          <label htmlFor="original-url" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <label htmlFor="destination-url" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
             Destination URL
           </label>
           <Input
-            id="original-url"
-            name="original_url"
+            id="destination-url"
+            name="url"
             required
             type="url"
             placeholder="https://example.com/your-page"

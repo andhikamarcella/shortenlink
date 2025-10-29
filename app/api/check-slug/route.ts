@@ -13,6 +13,12 @@ export async function GET(req: Request) {
   }
 
   const supabase = getSupabaseServerClient()
+  if (!supabase) {
+    return NextResponse.json(
+      { available: false, error: 'Supabase not configured' },
+      { status: 500 }
+    )
+  }
 
   const { data, error } = await supabase
     .from('links')
@@ -21,12 +27,13 @@ export async function GET(req: Request) {
     .maybeSingle()
 
   if (error && error.code !== 'PGRST116') {
+    console.error('[check-slug] supabase error:', error)
     return NextResponse.json(
-      { available: false, error: error.message },
+      { available: false, error: error.message ?? 'Query failed' },
       { status: 500 }
     )
   }
 
-  const isAvailable = !data
-  return NextResponse.json({ available: isAvailable })
+  const available = !data
+  return NextResponse.json({ available })
 }
