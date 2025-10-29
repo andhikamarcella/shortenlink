@@ -1,84 +1,127 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { isValidHttpUrl, sanitizeUrl } from '@/lib/validateUrl';
-import { checkRateLimit } from '@/lib/rateLimit';
-import { createServiceSupabaseClient } from '@/lib/supabase';
-import { generateSlug, slugPattern } from '@/lib/slug';
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { randomBytes } from 'crypto';
 
-const requestSchema = z.object({
-  original_url: z.string(),
-  custom_slug: z.string().max(24).optional(),
-  is_public: z.boolean().optional(),
-  user_id: z.string().optional(),
-});
+function generateRandomSlug(length: number = 7): string {
+  const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = randomBytes(length);
+  let slug = '';
 
-export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anonymous';
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ message: 'Rate limit exceeded. Try again in a few minutes.' }, { status: 429 });
+  for (let i = 0; i < length; i += 1) {
+    slug += characters[bytes[i] % characters.length];
   }
 
-  let payload: unknown;
+  return slug;
+}
+
+function isValidHttpUrl(url: string): boolean {
   try {
-    payload = await request.json();
-  } catch (error) {
-    return NextResponse.json({ message: 'Invalid JSON payload.' }, { status: 400 });
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
   }
-  const parsed = requestSchema.safeParse(payload);
+}
 
-  if (!parsed.success) {
-    return NextResponse.json({ message: 'Invalid request.', details: parsed.error.flatten() }, { status: 400 });
+function sanitizeSlug(slug: string): string {
+  return slug.toLowerCase().replace(/[^a-z0-9-_]/g, '');
+}
+
+export async function POST(request: Request) {
+  const body = await request.json();
+  const rawUrl = typeof body.original_url === 'string' ? body.original_url.trim() : '';
+  const desiredSlug = typeof body.custom_slug === 'string' ? body.custom_slug.trim() : undefined;
+  const requestedPublic = body.is_public === undefined ? true : Boolean(body.is_public);
+  const requestUserId = typeof body.user_id === 'string' ? body.user_id : null;
+
+  if (!isValidHttpUrl(rawUrl)) {
+    return NextResponse.json({ message: 'Invalid URL' }, { status: 400 });
   }
 
-  const body = parsed.data;
-  const sanitizedUrl = sanitizeUrl(body.original_url);
+  const supabase = createClient(
+    process.env.SUPABASE_URL as string,
+    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+    {
+      auth: { persistSession: false },
+    }
+  );
 
-  if (!isValidHttpUrl(sanitizedUrl)) {
-    return NextResponse.json({ message: 'Please provide a valid http(s) URL.' }, { status: 400 });
-  }
+  const sanitizedUrl = rawUrl;
+  let finalSlug: string;
 
-  const supabase = createServiceSupabaseClient();
+  if (desiredSlug && desiredSlug.length > 0) {
+    const cleaned = sanitizeSlug(desiredSlug);
 
-  let slug = body.custom_slug?.toLowerCase();
-  if (slug) {
-    if (!slugPattern.test(slug)) {
-      return NextResponse.json({ message: 'Slug can only contain letters, numbers, or hyphens.' }, { status: 400 });
+    if (!cleaned) {
+      return NextResponse.json({ message: 'Invalid custom slug' }, { status: 400 });
     }
 
-    const { data: existing } = await supabase.from('links').select('id').eq('slug', slug).maybeSingle();
+    const { data: existing, error: existsError } = await supabase
+      .from('links')
+      .select('id')
+      .eq('slug', cleaned)
+      .maybeSingle();
+
+    if (existsError) {
+      return NextResponse.json({ message: 'Failed to check slug availability' }, { status: 500 });
+    }
+
     if (existing) {
-      return NextResponse.json({ message: 'This slug is already taken.' }, { status: 409 });
+      return NextResponse.json({ message: 'Slug already taken' }, { status: 409 });
     }
+
+    finalSlug = cleaned;
   } else {
-    let attempts = 0;
-    while (!slug && attempts < 5) {
-      const candidate = generateSlug(6 + Math.floor(Math.random() * 3));
-      const { data: existing } = await supabase.from('links').select('id').eq('slug', candidate).maybeSingle();
-      if (!existing) {
-        slug = candidate;
+    let generated = '';
+    while (!generated) {
+      const candidate = generateRandomSlug();
+      const { data: taken, error: takenError } = await supabase
+        .from('links')
+        .select('id')
+        .eq('slug', candidate)
+        .maybeSingle();
+
+      if (takenError) {
+        return NextResponse.json({ message: 'Failed to generate slug' }, { status: 500 });
       }
-      attempts += 1;
+
+      if (!taken) {
+        generated = candidate;
+      }
     }
 
-    if (!slug) {
-      return NextResponse.json({ message: 'Unable to generate a unique slug. Please try again.' }, { status: 500 });
-    }
+    finalSlug = generated;
   }
 
-  const { error } = await supabase.from('links').insert({
-    slug,
-    original_url: sanitizedUrl,
-    user_id: body.user_id ?? null,
-    is_public: body.is_public ?? true,
-  });
+  const { data: inserted, error: insertError } = await supabase
+    .from('links')
+    .insert([
+      {
+        slug: finalSlug,
+        original_url: sanitizedUrl,
+        user_id: requestUserId,
+        clicks: 0,
+        is_public: requestedPublic,
+      },
+    ])
+    .select('*')
+    .single();
 
-  if (error) {
-    console.error('Error creating link', error);
-    return NextResponse.json({ message: 'Failed to save link.' }, { status: 500 });
+  if (insertError || !inserted) {
+    return NextResponse.json({ message: 'Failed to create short link' }, { status: 500 });
   }
 
-  const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'http://localhost:3000';
-  const shortUrl = `${origin.replace(/\/$/, '')}/${slug}`;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? process.env.FALLBACK_BASE_URL ?? '';
+  const normalizedBase = baseUrl.replace(/\/$/, '');
+  const shortUrl = normalizedBase ? `${normalizedBase}/${inserted.slug}` : `/${inserted.slug}`;
 
-  return NextResponse.json({ shortUrl, slug });
+  return NextResponse.json(
+    {
+      slug: inserted.slug,
+      shortUrl,
+      clicks: inserted.clicks,
+      created_at: inserted.created_at,
+    },
+    { status: 201 }
+  );
 }
