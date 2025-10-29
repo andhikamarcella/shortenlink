@@ -1,10 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/Button';
 import { LinkRow, LinkRecord } from '@/components/LinkRow';
-import QRCode from 'qrcode';
 import { createBrowserSupabaseClient } from '@/lib/supabase';
 
 interface DashboardClientProps {
@@ -15,11 +14,16 @@ interface DashboardClientProps {
 
 type SortOption = 'newest' | 'clicks';
 
+type QRCodeModule = {
+  toDataURL: (text: string, options?: { margin?: number; width?: number }) => Promise<string>;
+};
+
 export function DashboardClient({ initialLinks, shortBase, userEmail }: DashboardClientProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [sort, setSort] = useState<SortOption>('newest');
   const [links, setLinks] = useState(initialLinks);
   const [status, setStatus] = useState('');
+  const qrModuleRef = useRef<QRCodeModule | null>(null);
 
   const sortedLinks = useMemo(() => {
     const copy = [...links];
@@ -29,37 +33,60 @@ export function DashboardClient({ initialLinks, shortBase, userEmail }: Dashboar
     return copy.sort((a, b) => b.clicks - a.clicks);
   }, [links, sort]);
 
-  const records: LinkRecord[] = sortedLinks.map((link) => ({
-    ...link,
-    shortUrl: `${shortBase}/${link.slug}`,
-  }));
+  const records: LinkRecord[] = useMemo(
+    () =>
+      sortedLinks.map((link) => ({
+        ...link,
+        shortUrl: `${shortBase}/${link.slug}`,
+      })),
+    [shortBase, sortedLinks]
+  );
 
-  const handleCopy = async (url: string) => {
-    await navigator.clipboard.writeText(url);
-    setStatus('Short link copied to clipboard.');
-  };
+  const loadQrDataUrl = useCallback(
+    async (url: string) => {
+      if (!qrModuleRef.current) {
+        qrModuleRef.current = (await import('qrcode')) as QRCodeModule;
+      }
+      return qrModuleRef.current.toDataURL(url, { margin: 1, width: 512 });
+    },
+    []
+  );
 
-  const handleDelete = async (slug: string) => {
-    const response = await fetch(`/api/link/${slug}`, { method: 'DELETE' });
-    if (!response.ok) {
-      const error = await response.json();
-      setStatus(error.message || 'Failed to delete link.');
-      return;
-    }
-    setLinks((prev) => prev.filter((item) => item.slug !== slug));
-    setStatus('Link deleted successfully.');
-  };
+  const generateQr = useCallback(
+    async (slug: string) => {
+      const record = records.find((item) => item.slug === slug);
+      const url = record ? record.shortUrl : `${shortBase}/${slug}`;
+      return loadQrDataUrl(url);
+    },
+    [loadQrDataUrl, records, shortBase]
+  );
 
-  const generateQr = async (slug: string) => {
-    const record = records.find((item) => item.slug === slug);
-    const url = record ? record.shortUrl : `${shortBase}/${slug}`;
-    return QRCode.toDataURL(url, { margin: 1, width: 512 });
-  };
+  const handleCopy = useCallback(
+    async (url: string) => {
+      await navigator.clipboard.writeText(url);
+      setStatus('Short link copied to clipboard.');
+    },
+    []
+  );
 
-  const handleSignOut = async () => {
+  const handleDelete = useCallback(
+    async (slug: string) => {
+      const response = await fetch(`/api/link/${slug}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const error = await response.json();
+        setStatus(error.message || 'Failed to delete link.');
+        return;
+      }
+      setLinks((prev) => prev.filter((item) => item.slug !== slug));
+      setStatus('Link deleted successfully.');
+    },
+    []
+  );
+
+  const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     window.location.reload();
-  };
+  }, [supabase]);
 
   return (
     <div className="space-y-8">
@@ -84,18 +111,10 @@ export function DashboardClient({ initialLinks, shortBase, userEmail }: Dashboar
           </Link>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-slate-600 dark:text-slate-400">Sort by:</span>
-            <Button
-              variant={sort === 'newest' ? 'primary' : 'secondary'}
-              onClick={() => setSort('newest')}
-              aria-pressed={sort === 'newest'}
-            >
+            <Button variant={sort === 'newest' ? 'primary' : 'secondary'} onClick={() => setSort('newest')} aria-pressed={sort === 'newest'}>
               Newest
             </Button>
-            <Button
-              variant={sort === 'clicks' ? 'primary' : 'secondary'}
-              onClick={() => setSort('clicks')}
-              aria-pressed={sort === 'clicks'}
-            >
+            <Button variant={sort === 'clicks' ? 'primary' : 'secondary'} onClick={() => setSort('clicks')} aria-pressed={sort === 'clicks'}>
               Clicks
             </Button>
           </div>
@@ -151,12 +170,12 @@ export function DashboardClient({ initialLinks, shortBase, userEmail }: Dashboar
                         variant="secondary"
                         onClick={async () => {
                           const dataUrl = await generateQr(link.slug);
-                          const linkEl = document.createElement('a');
-                          linkEl.href = dataUrl;
-                          linkEl.download = `qr-${link.slug}.png`;
-                          document.body.appendChild(linkEl);
-                          linkEl.click();
-                          linkEl.remove();
+                          const anchor = document.createElement('a');
+                          anchor.href = dataUrl;
+                          anchor.download = `qr-${link.slug}.png`;
+                          document.body.appendChild(anchor);
+                          anchor.click();
+                          anchor.remove();
                         }}
                         aria-label={`Download QR for ${link.slug}`}
                       >
