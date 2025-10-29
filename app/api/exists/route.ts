@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { slugPattern } from '@/lib/slug';
 
 export async function GET(request: NextRequest) {
@@ -7,11 +7,34 @@ export async function GET(request: NextRequest) {
   const slug = searchParams.get('slug');
 
   if (!slug || !slugPattern.test(slug)) {
-    return NextResponse.json({ exists: false });
+    return NextResponse.json(
+      { available: false, message: 'Invalid slug format' },
+      { status: 400 }
+    );
   }
 
-  const supabase = createServiceSupabaseClient();
-  const { data } = await supabase.from('links').select('id').eq('slug', slug.toLowerCase()).maybeSingle();
+  const supabase = createServerSupabaseClient();
 
-  return NextResponse.json({ exists: Boolean(data) });
+  const { data, error } = await supabase
+    .from('links')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json(
+      { available: false, message: 'Lookup failed' },
+      { status: 500 }
+    );
+  }
+
+  const isTaken = Boolean(data);
+
+  return NextResponse.json(
+    {
+      available: !isTaken,
+      message: !isTaken ? 'Slug is available' : 'Slug is already taken',
+    },
+    { status: 200 }
+  );
 }
