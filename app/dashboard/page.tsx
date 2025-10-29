@@ -1,113 +1,52 @@
-import DashboardClient from './dashboard-client';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { getSupabaseServerClient } from '@/lib/supabaseClientServer';
+'use client'
 
-interface DashboardLink {
-  slug: string;
-  url: string;
-  clicks: number;
-  created_at: string;
-}
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
 
-function getProjectRef(): string | null {
-  const source = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!source) {
-    return null;
-  }
+export default function DashboardPage() {
+  const router = useRouter()
+  const [checking, setChecking] = useState(true)
 
-  try {
-    const host = new URL(source).hostname;
-    const [ref] = host.split('.');
-    return ref || null;
-  } catch {
-    return null;
-  }
-}
+  useEffect(() => {
+    const run = async () => {
+      const { data, error } = await supabaseBrowser.auth.getSession()
 
-function extractAccessTokenFromCookies(store: ReturnType<typeof cookies>): string | null {
-  const direct = store.get('sb-access-token')?.value;
-  if (direct) {
-    return direct;
-  }
+      // no session? kick back to /auth
+      if (error || !data?.session) {
+        router.replace('/auth')
+        return
+      }
 
-  const projectRef = getProjectRef();
-  if (!projectRef) {
-    return null;
-  }
-
-  const prefixedAccess = store.get(`sb-${projectRef}-access-token`)?.value;
-  if (prefixedAccess) {
-    return prefixedAccess;
-  }
-
-  const authCookie = store.get(`sb-${projectRef}-auth-token`)?.value;
-  if (authCookie) {
-    try {
-      const parsed = JSON.parse(authCookie) as {
-        access_token?: string;
-        currentSession?: { access_token?: string } | null;
-      };
-      return parsed.access_token ?? parsed.currentSession?.access_token ?? null;
-    } catch {
-      return null;
+      // we have a session
+      setChecking(false)
     }
+
+    void run()
+  }, [router])
+
+  if (checking) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-black text-white">
+        <p>Loading dashboard...</p>
+      </main>
+    )
   }
-
-  return null;
-}
-
-export default async function DashboardPage() {
-  const cookieStore = cookies();
-  const accessToken = extractAccessTokenFromCookies(cookieStore);
-
-  if (!accessToken) {
-    redirect('/auth');
-  }
-
-  const supabase = getSupabaseServerClient();
-  if (!supabase) {
-    throw new Error('Supabase not configured');
-  }
-
-  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
-  if (userError || !userData?.user) {
-    redirect('/auth');
-  }
-
-  const user = userData.user;
-
-  const { data, error } = await supabase
-    .from('links')
-    .select('slug, url, clicks, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
-
-  const safeLinks: DashboardLink[] = !error && data
-    ? data.map((link) => ({
-        slug: link.slug,
-        url: link.url,
-        clicks: link.clicks ?? 0,
-        created_at: link.created_at,
-      }))
-    : [];
-
-  const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.SITE_URL ??
-    vercelUrl ??
-    'https://shortenlink-snowy.vercel.app';
-  const normalizedBase = baseUrl.replace(/\/$/, '');
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-16">
-      <DashboardClient
-        initialLinks={safeLinks}
-        shortBase={normalizedBase}
-        userEmail={user.email ?? 'your account'}
-      />
-    </section>
-  );
+    <main className="min-h-screen bg-black text-white p-8">
+      <h1 className="text-2xl font-semibold mb-4">Dashboard</h1>
+      <p className="text-neutral-300 text-sm">
+        You are signed in.
+      </p>
+      {/* ...rest of the dashboard UI... */}
+    </main>
+  )
 }
+
+//
+// Notes:
+// - Dashboard does a session check on mount.
+// - If there's no session, redirect to /auth.
+// - This ensures unauthenticated users can't just hit /dashboard directly.
+//

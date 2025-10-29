@@ -9,11 +9,14 @@ export default function AuthPage() {
   const handleLogin = async () => {
     setLoading(true)
 
+    // IMPORTANT:
+    // NEXT_PUBLIC_BASE_URL should be exactly "https://shortenlink-snowy.vercel.app"
+    // (NO trailing slash) in Vercel environment variables.
+    // The final redirectTo must match the Supabase provider config AND
+    // the Google OAuth "Authorized redirect URIs".
     const { error } = await supabaseBrowser.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // IMPORTANT: redirectTo MUST match Supabase Auth -> URL Configuration -> Redirect URLs
-        // and must be EXACTLY this domain. Do not include a trailing "#".
         redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
       },
     })
