@@ -32,6 +32,16 @@ type AnalyticsUser = {
 type LinkRow = {
   id: string;
   slug: string;
+  destination_url: string | null;
+  url: string | null;
+  created_at: string;
+  clicks_count: number | null;
+  user_id: string | null;
+};
+
+type NormalizedLink = {
+  id: string;
+  slug: string;
   destination_url: string;
   created_at: string;
   clicks_count: number;
@@ -76,7 +86,7 @@ export function AnalyticsClient({ user }: { user: AnalyticsUser }) {
 
     let linksQuery = supabase
       .from('links')
-      .select('id, slug, destination_url, created_at, clicks_count, user_id')
+      .select('id, slug, destination_url, url, created_at, clicks_count, user_id')
       .order('created_at', { ascending: false });
 
     if (!user.isModerator) {
@@ -96,7 +106,14 @@ export function AnalyticsClient({ user }: { user: AnalyticsUser }) {
       return;
     }
 
-    const relevantLinks = linkRows ?? [];
+    const relevantLinks: NormalizedLink[] = (linkRows ?? []).map((link) => ({
+      id: link.id,
+      slug: link.slug,
+      destination_url: link.destination_url ?? link.url ?? '',
+      created_at: link.created_at,
+      clicks_count: link.clicks_count ?? 0,
+      user_id: link.user_id,
+    }));
 
     const slugs = relevantLinks.map((link) => link.slug);
     if (slugs.length === 0) {

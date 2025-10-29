@@ -17,7 +17,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
 
   const { data, error } = await supabase
     .from('links')
-    .select('destination_url, clicks_count')
+    .select('destination_url, url, clicks_count')
     .eq('slug', slug)
     .maybeSingle();
 
@@ -26,7 +26,9 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     return NextResponse.json({ error: 'Failed to look up slug' }, { status: 500 });
   }
 
-  if (!data?.destination_url) {
+  const destination = data?.destination_url ?? data?.url ?? null;
+
+  if (!destination) {
     return new Response('Not found', { status: 404 });
   }
 
@@ -51,5 +53,5 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     }
   }
 
-  return NextResponse.redirect(data.destination_url, { status: 302 });
+  return NextResponse.redirect(destination, { status: 302 });
 }

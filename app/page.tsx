@@ -6,7 +6,6 @@ import { Input } from '@/components/Input';
 import { isValidHttpUrl, sanitizeUrl } from '@/lib/validateUrl';
 import { slugPattern } from '@/lib/slug';
 import QRCode from 'qrcode';
-import { supabaseBrowser } from '@/lib/supabaseClientBrowser';
 
 interface ShortenResponse {
   shortUrl: string;
@@ -56,7 +55,6 @@ const checkSlugAvailability = async (slug: string): Promise<SlugAvailabilityResu
 };
 
 export default function HomePage() {
-  const supabase = supabaseBrowser;
   const [originalUrl, setOriginalUrl] = useState('');
   const [customSlug, setCustomSlug] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -68,15 +66,8 @@ export default function HomePage() {
   const [result, setResult] = useState<ShortenResponse | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
-  const [userId, setUserId] = useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id ?? null);
-    });
-  }, [supabase]);
 
   useEffect(() => {
     return () => {
@@ -173,14 +164,10 @@ export default function HomePage() {
         }
       }
 
-      const payload: { slug: string; destination_url: string; user_id?: string | null } = {
+      const payload: { slug: string; destination_url: string } = {
         slug: slugToUse,
         destination_url: sanitizedUrl,
       };
-
-      if (userId) {
-        payload.user_id = userId;
-      }
 
       const response = await fetch('/api/shorten', {
         method: 'POST',

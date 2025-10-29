@@ -1,14 +1,15 @@
 'use client'
 
-import { createClient } from '@supabase/supabase-js'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import type { Database } from './types'
 
-export const supabaseBrowser = createClient(url, anon)
+export const supabaseBrowser = createClientComponentClient<Database>()
 
 //
 // Notes:
-// - This file is ONLY for client components ("use client").
-// - We do not import service role here, only anon.
+// - This helper exposes the browser Supabase client configured with auth-helpers
+//   so OAuth callbacks persist sessions via cookies.
+// - Only call this file from client components (the module itself is marked as
+//   a client boundary).
 //

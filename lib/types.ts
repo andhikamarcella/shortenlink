@@ -14,25 +14,28 @@ export interface Database {
           id: string;
           user_id: string | null;
           slug: string;
-          destination_url: string;
+          destination_url: string | null;
+          url: string | null;
           created_at: string;
-          clicks_count: number;
+          clicks_count: number | null;
         };
         Insert: {
           id?: string;
           user_id?: string | null;
           slug: string;
-          destination_url: string;
+          destination_url?: string | null;
+          url?: string | null;
           created_at?: string;
-          clicks_count?: number;
+          clicks_count?: number | null;
         };
         Update: {
           id?: string;
           user_id?: string | null;
           slug?: string;
-          destination_url?: string;
+          destination_url?: string | null;
+          url?: string | null;
           created_at?: string;
-          clicks_count?: number;
+          clicks_count?: number | null;
         };
       };
       clicks: {

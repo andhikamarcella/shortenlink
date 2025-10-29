@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 import { FeedbackPanel } from '@/app/components/FeedbackPanel';
+import { slugPattern } from '@/lib/slug';
 
 type DashboardUser = {
   id: string;
@@ -61,7 +62,7 @@ export function DashboardClient({ user }: { user: DashboardUser }) {
 
     const { data, error: fetchError } = await supabase
       .from('links')
-      .select('id, slug, destination_url, created_at, clicks_count')
+      .select('id, slug, destination_url, url, created_at, clicks_count')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -73,7 +74,15 @@ export function DashboardClient({ user }: { user: DashboardUser }) {
       return;
     }
 
-    setLinks(data ?? []);
+    const normalised = (data ?? []).map((link) => ({
+      id: link.id,
+      slug: link.slug,
+      destination_url: link.destination_url ?? link.url ?? '',
+      created_at: link.created_at,
+      clicks_count: link.clicks_count ?? 0,
+    }));
+
+    setLinks(normalised);
     setLoading(false);
   }, [supabase, user.id]);
 
@@ -144,6 +153,10 @@ export function DashboardClient({ user }: { user: DashboardUser }) {
       let slug = customSlug.trim().toLowerCase();
       if (!slug) {
         slug = generateSlug();
+      } else if (!slugPattern.test(slug)) {
+        setCreateError('Slug may only include letters, numbers, or hyphens.');
+        setCreating(false);
+        return;
       }
 
       const payload: Record<string, unknown> = {
