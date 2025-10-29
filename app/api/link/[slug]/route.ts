@@ -1,43 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createRouteSupabaseClient, createServiceSupabaseClient } from '@/lib/supabase';
-import { slugPattern } from '@/lib/slug';
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-interface RouteParams {
-  params: {
-    slug: string;
-  };
-}
+export async function DELETE(
+  _request: Request,
+  context: { params: { slug: string } }
+) {
+  const { slug } = context.params;
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  if (!slugPattern.test(params.slug)) {
-    return NextResponse.json({ message: 'Invalid slug.' }, { status: 400 });
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    return NextResponse.json(
+      { message: 'Server configuration error' },
+      { status: 500 }
+    );
   }
 
-  const supabase = await createRouteSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: { persistSession: false },
+  });
 
-  if (!user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  const user = null as { id: string } | null;
+
+  const { data: link, error } = await supabase
+    .from('links')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (error || !link) {
+    return NextResponse.json(
+      { message: 'Link not found' },
+      { status: 404 }
+    );
   }
 
-  const admin = createServiceSupabaseClient();
-  const { data: link } = await admin.from('links').select('id, user_id').eq('slug', params.slug).maybeSingle();
-
-  if (!link) {
-    return NextResponse.json({ message: 'Link not found.' }, { status: 404 });
+  if (link.user_id && user && link.user_id !== user.id) {
+    return NextResponse.json(
+      { message: 'You do not have permission to delete this link.' },
+      { status: 403 }
+    );
   }
 
-  if (link.user_id && link.user_id !== user.id) {
-    return NextResponse.json({ message: 'You do not have permission to delete this link.' }, { status: 403 });
+  const { error: deleteError } = await supabase
+    .from('links')
+    .delete()
+    .eq('id', link.id);
+
+  if (deleteError) {
+    return NextResponse.json(
+      { message: 'Failed to delete link' },
+      { status: 500 }
+    );
   }
 
-  const { error } = await admin.from('links').delete().eq('id', link.id);
-  if (error) {
-    console.error('Failed to delete link', error);
-    return NextResponse.json({ message: 'Failed to delete link.' }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json(
+    { message: 'Deleted successfully' },
+    { status: 200 }
+  );
 }
