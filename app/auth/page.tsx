@@ -8,11 +8,13 @@ export default function AuthPage() {
 
   const handleLogin = async () => {
     setLoading(true)
-    const redirectTo = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`
+
     const { error } = await supabaseBrowser.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo,
+        // IMPORTANT: redirectTo MUST match Supabase Auth -> URL Configuration -> Redirect URLs
+        // and must be EXACTLY this domain. Do not include a trailing "#".
+        redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
       },
     })
 

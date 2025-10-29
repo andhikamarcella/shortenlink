@@ -5,7 +5,7 @@ export function getSupabaseServerClient() {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!url || !anon) {
-    console.error('[supabase] missing env NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    console.error('[supabase] missing env')
     return null
   }
 
