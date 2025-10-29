@@ -1,19 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
-import { createServerComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import type { Database } from './types';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const supabasePublicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabasePublicAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Supabase URL and anon key must be provided. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
-  );
-}
+export function createBrowserSupabaseClient(): SupabaseClient<Database> {
+  if (!supabasePublicUrl || !supabasePublicAnonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  }
 
-export function createBrowserSupabaseClient() {
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createClient<Database>(supabasePublicUrl, supabasePublicAnonKey, {
     auth: {
       persistSession: true,
       detectSessionInUrl: true,
@@ -21,26 +19,12 @@ export function createBrowserSupabaseClient() {
   });
 }
 
-export async function createServerSupabaseClient() {
-  const { cookies } = await import('next/headers');
-  return createServerComponentClient<Database>({
-    cookies,
-  });
-}
-
-export async function createRouteSupabaseClient() {
-  const { cookies } = await import('next/headers');
-  return createRouteHandlerClient<Database>({
-    cookies,
-  });
-}
-
-export function createServiceSupabaseClient() {
-  if (!supabaseServiceRoleKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY must be set for server operations.');
+export function createServerSupabaseClient(): SupabaseClient<Database> {
+  if (!supabaseServiceUrl || !supabaseServiceRoleKey) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  return createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
+  return createClient<Database>(supabaseServiceUrl, supabaseServiceRoleKey, {
     auth: {
       persistSession: false,
     },
