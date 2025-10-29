@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabaseClientServer';
 import { slugPattern } from '@/lib/slug';
 
 export async function GET(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = getSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('links')

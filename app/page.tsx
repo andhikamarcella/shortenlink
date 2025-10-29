@@ -1,35 +1,56 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { isValidHttpUrl, sanitizeUrl } from '@/lib/validateUrl';
 import { slugPattern } from '@/lib/slug';
 import QRCode from 'qrcode';
-import { createBrowserSupabaseClient } from '@/lib/supabase';
+import { supabaseBrowser } from '@/lib/supabaseClientBrowser';
 
 interface ShortenResponse {
   shortUrl: string;
   slug: string;
 }
 
-const fetchSlugAvailability = async (slug: string) => {
-  const response = await fetch(`/api/exists?slug=${encodeURIComponent(slug)}`);
-  if (!response.ok) {
-    throw new Error('Failed to validate slug');
+interface SlugAvailabilityResult {
+  available: boolean;
+  error?: string;
+}
+
+const checkSlugAvailability = async (slug: string): Promise<SlugAvailabilityResult> => {
+  if (!slug) {
+    return { available: true };
   }
-  const data = await response.json();
-  return data.exists as boolean;
+
+  const response = await fetch(`/api/check-slug?slug=${encodeURIComponent(slug)}`);
+  let body: { available?: boolean; error?: string } = {};
+
+  try {
+    body = (await response.json()) as { available?: boolean; error?: string };
+  } catch {
+    body = {};
+  }
+
+  if (!response.ok) {
+    return { available: false, error: body.error || 'Unable to check slug availability right now.' };
+  }
+
+  return {
+    available: Boolean(body.available),
+    error: body.error,
+  };
 };
 
 export default function HomePage() {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = supabaseBrowser;
   const [originalUrl, setOriginalUrl] = useState('');
   const [customSlug, setCustomSlug] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
   const [slugError, setSlugError] = useState<string | null>(null);
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [slugCheckError, setSlugCheckError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ShortenResponse | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -56,16 +77,21 @@ export default function HomePage() {
     if (!customSlug) {
       setSlugError(null);
       setSlugAvailable(null);
+      setSlugCheckError(false);
+      setIsCheckingSlug(false);
       return;
     }
 
     if (!slugPattern.test(customSlug)) {
       setSlugError('Custom slug may only contain letters, numbers, or hyphens (max 24 characters).');
       setSlugAvailable(null);
+      setSlugCheckError(false);
+      setIsCheckingSlug(false);
       return;
     }
 
     setSlugError(null);
+    setSlugCheckError(false);
     setIsCheckingSlug(true);
 
     if (debounceRef.current) {
@@ -74,13 +100,20 @@ export default function HomePage() {
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const exists = await fetchSlugAvailability(customSlug);
-        setSlugAvailable(!exists);
-        if (exists) {
+        const result = await checkSlugAvailability(customSlug);
+        if (result.error) {
+          setSlugCheckError(true);
+          setSlugAvailable(null);
+          return;
+        }
+
+        setSlugCheckError(false);
+        setSlugAvailable(result.available);
+        if (!result.available) {
           setSlugError('This slug is already taken. Try another one.');
         }
-      } catch (error) {
-        setSlugError('Unable to check slug availability right now.');
+      } catch {
+        setSlugCheckError(true);
         setSlugAvailable(null);
       } finally {
         setIsCheckingSlug(false);
@@ -204,9 +237,19 @@ export default function HomePage() {
             error={slugError || undefined}
             hint="Use letters, numbers, or hyphens."
           />
-          {slugAvailable && !slugError && customSlug && (
+          {slugAvailable && !slugError && customSlug && !slugCheckError && (
             <p className="mt-1 text-sm text-green-600 dark:text-green-400" role="status">
-              Great! This slug is available.
+              ✅ Available
+            </p>
+          )}
+          {slugAvailable === false && !slugCheckError && customSlug && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="status">
+              ❌ Taken
+            </p>
+          )}
+          {slugCheckError && !slugError && customSlug && (
+            <p className="mt-1 text-sm text-amber-500 dark:text-amber-400" role="status">
+              ⚠️ Error checking slug
             </p>
           )}
         </div>

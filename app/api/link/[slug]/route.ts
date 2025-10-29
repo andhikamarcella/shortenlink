@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient } from '@/lib/supabaseClientServer';
 
 export async function DELETE(
   request: Request,
@@ -7,13 +7,7 @@ export async function DELETE(
 ) {
   const { slug } = context.params;
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL as string,
-    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
-    {
-      auth: { persistSession: false },
-    }
-  );
+  const supabase = getSupabaseServerClient();
 
   const user = null as { id: string } | null;
 

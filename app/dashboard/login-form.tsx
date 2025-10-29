@@ -1,12 +1,12 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
-import { createBrowserSupabaseClient } from '@/lib/supabase';
+import { supabaseBrowser } from '@/lib/supabaseClientBrowser';
 
 export function LoginForm() {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = supabaseBrowser;
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);

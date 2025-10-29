@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabaseClientServer';
 
 const slugPattern = /^[a-z0-9-]+$/;
 
@@ -38,7 +38,7 @@ function getAccessToken(request: Request): string | null {
 }
 
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
+  const supabase = getSupabaseServerClient();
   let body: unknown;
 
   try {

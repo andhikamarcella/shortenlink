@@ -1,7 +1,7 @@
 import DashboardClient from './dashboard-client';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabaseClientServer';
 
 interface DashboardLink {
   slug: string;
@@ -11,7 +11,7 @@ interface DashboardLink {
 }
 
 function getProjectRef(): string | null {
-  const source = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  const source = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!source) {
     return null;
   }
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
     redirect('/auth');
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = getSupabaseServerClient();
 
   const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
   if (userError || !userData?.user) {

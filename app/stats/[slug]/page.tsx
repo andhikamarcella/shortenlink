@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient } from '@/lib/supabaseClientServer';
 
 function getHostname(url: string): string {
   try {
@@ -14,11 +14,7 @@ export default async function StatsPage({
 }: {
   params: { slug: string };
 }) {
-  const supabase = createClient(
-    process.env.SUPABASE_URL as string,
-    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
-    { auth: { persistSession: false } }
-  );
+  const supabase = getSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('links')
