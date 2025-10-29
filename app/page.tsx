@@ -19,6 +19,18 @@ interface SlugAvailabilityResult {
   error?: string;
 }
 
+const RANDOM_SLUG_LENGTH = 7;
+const ALPHANUMERIC = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+const generateRandomSlug = (length = RANDOM_SLUG_LENGTH) => {
+  let slug = '';
+  while (slug.length < length) {
+    const randomIndex = Math.floor(Math.random() * ALPHANUMERIC.length);
+    slug += ALPHANUMERIC[randomIndex];
+  }
+  return slug;
+};
+
 const checkSlugAvailability = async (slug: string): Promise<SlugAvailabilityResult> => {
   if (!slug) {
     return { available: true };
@@ -122,10 +134,12 @@ export default function HomePage() {
     }, 400);
   }, [customSlug]);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateShortLink = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setUrlError(null);
     setStatusMessage('');
+    setResult(null);
+    setQrDataUrl(null);
 
     const sanitizedUrl = sanitizeUrl(originalUrl);
     if (!isValidHttpUrl(sanitizedUrl)) {
@@ -133,7 +147,7 @@ export default function HomePage() {
       return;
     }
 
-    if (customSlug && (!slugPattern.test(customSlug) || slugAvailable === false)) {
+    if (customSlug && (!slugPattern.test(customSlug) || slugAvailable === false || slugCheckError)) {
       setSlugError('This slug is not available.');
       return;
     }
@@ -141,30 +155,74 @@ export default function HomePage() {
     setIsLoading(true);
 
     try {
+      let slugToUse = customSlug.trim().toLowerCase();
+
+      if (!slugToUse) {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const candidate = generateRandomSlug();
+          const availability = await checkSlugAvailability(candidate);
+          if (!availability.error && availability.available) {
+            slugToUse = candidate;
+            break;
+          }
+        }
+
+        if (!slugToUse) {
+          setStatusMessage('Unable to generate available slug. Please try again.');
+          return;
+        }
+      }
+
+      const payload: { slug: string; url: string; user_id?: string | null } = {
+        slug: slugToUse,
+        url: sanitizedUrl,
+      };
+
+      if (userId) {
+        payload.user_id = userId;
+      }
+
       const response = await fetch('/api/shorten', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: sanitizedUrl,
-          custom_slug: customSlug || undefined,
-          is_public: true,
-          user_id: userId ?? undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to shorten URL');
+      let body: { success?: boolean; error?: string } = {};
+      try {
+        body = (await response.json()) as { success?: boolean; error?: string };
+      } catch {
+        body = {};
       }
 
-      const data = (await response.json()) as ShortenResponse;
-      setResult(data);
+      if (!response.ok || !body.success) {
+        const errorMessage = body.error || 'Failed to create short link';
+        setStatusMessage(errorMessage);
+        console.error('Create short link failed:', body.error ?? errorMessage);
+        if (errorMessage.toLowerCase().includes('duplicate')) {
+          setSlugAvailable(false);
+          setSlugError('This slug is already taken. Try another one.');
+        }
+        return;
+      }
+
+      const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin).replace(/\/$/, '');
+      const shortUrl = `${baseUrl}/${slugToUse}`;
+
+      setResult({ shortUrl, slug: slugToUse, url: sanitizedUrl });
       setStatusMessage('Success! Your link is ready.');
-      const qr = await QRCode.toDataURL(data.shortUrl, { margin: 2, width: 256 });
+      setSlugAvailable(null);
+      setSlugCheckError(false);
+      setSlugError(null);
+      setCustomSlug('');
+
+      const qr = await QRCode.toDataURL(shortUrl, { margin: 2, width: 256 });
       setQrDataUrl(qr);
       setTimeout(() => resultRef.current?.focus(), 50);
     } catch (error: any) {
-      setStatusMessage(error.message || 'Something went wrong. Please try again.');
+      const fallbackMessage = error?.message || 'Something went wrong. Please try again.';
+      setStatusMessage(fallbackMessage);
+      console.error('Create short link failed:', error);
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +252,7 @@ export default function HomePage() {
 
       <form
         className="w-full max-w-3xl space-y-6 rounded-3xl bg-white/90 p-8 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800"
-        onSubmit={handleSubmit}
+        onSubmit={handleCreateShortLink}
         aria-busy={isLoading}
       >
         <div>
