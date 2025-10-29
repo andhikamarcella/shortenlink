@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { randomBytes } from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabase';
 
-const slugPattern = /^[a-z0-9-]{1,24}$/;
+const slugPattern = /^[a-z0-9-]+$/;
 
-function sanitizeUrl(value: string): string | null {
+function normalizeUrl(value: string): string | null {
   try {
     const parsed = new URL(value.trim());
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -17,138 +15,79 @@ function sanitizeUrl(value: string): string | null {
   }
 }
 
-function generateRandomSlug(length = 7): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = randomBytes(length);
-  let output = '';
-
-  for (let index = 0; index < length; index += 1) {
-    output += alphabet[bytes[index] % alphabet.length];
+function generateRandomSlug(): string {
+  let slug = '';
+  while (slug.length < 7) {
+    slug += Math.random().toString(36).slice(2);
   }
-
-  return output;
+  return slug.slice(0, 7);
 }
 
-function getProjectRef(): string | null {
-  const source = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  if (!source) {
+function getAccessToken(request: Request): string | null {
+  const header = request.headers.get('authorization') ?? request.headers.get('Authorization');
+  if (!header) {
     return null;
   }
 
-  try {
-    const host = new URL(source).hostname;
-    const [ref] = host.split('.');
-    return ref || null;
-  } catch {
-    return null;
-  }
-}
-
-function extractAccessToken(request: Request): string | null {
-  const headerToken = request.headers.get('authorization') ?? request.headers.get('Authorization');
-  if (headerToken?.startsWith('Bearer ')) {
-    return headerToken.slice(7).trim();
-  }
-
-  const store = cookies();
-  const direct = store.get('sb-access-token')?.value;
-  if (direct) {
-    return direct;
-  }
-
-  const projectRef = getProjectRef();
-  if (!projectRef) {
-    return null;
-  }
-
-  const prefixed = store.get(`sb-${projectRef}-access-token`)?.value;
-  if (prefixed) {
-    return prefixed;
-  }
-
-  const authCookie = store.get(`sb-${projectRef}-auth-token`)?.value;
-  if (authCookie) {
-    try {
-      const parsed = JSON.parse(authCookie) as {
-        access_token?: string;
-        currentSession?: { access_token?: string } | null;
-      };
-      return parsed.access_token ?? parsed.currentSession?.access_token ?? null;
-    } catch {
-      return null;
-    }
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() === 'bearer' && token) {
+    return token;
   }
 
   return null;
 }
 
 export async function POST(request: Request) {
-  let payload: unknown;
+  const supabase = createServerSupabaseClient();
+  let body: unknown;
 
   try {
-    payload = await request.json();
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    return NextResponse.json({ message: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  if (typeof payload !== 'object' || payload === null) {
-    return NextResponse.json({ error: 'Invalid request payload' }, { status: 400 });
+  if (typeof body !== 'object' || body === null) {
+    return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
   }
 
-  const body = payload as {
-    url?: unknown;
-    slug?: unknown;
+  const { original_url, custom_slug } = body as {
     original_url?: unknown;
     custom_slug?: unknown;
   };
 
-  const rawUrl =
-    typeof body.url === 'string'
-      ? body.url.trim()
-      : typeof body.original_url === 'string'
-      ? body.original_url.trim()
-      : '';
-
-  if (!rawUrl) {
-    return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+  if (typeof original_url !== 'string' || original_url.trim().length === 0) {
+    return NextResponse.json({ message: 'Invalid URL' }, { status: 400 });
   }
 
-  const sanitizedUrl = sanitizeUrl(rawUrl);
+  const sanitizedUrl = normalizeUrl(original_url);
   if (!sanitizedUrl) {
-    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    return NextResponse.json({ message: 'Invalid URL' }, { status: 400 });
   }
-
-  const requestedSlug =
-    typeof body.slug === 'string'
-      ? body.slug.trim().toLowerCase()
-      : typeof body.custom_slug === 'string'
-      ? body.custom_slug.trim().toLowerCase()
-      : '';
-
-  const supabase = createServerSupabaseClient();
 
   let finalSlug: string | null = null;
 
-  if (requestedSlug) {
-    if (!slugPattern.test(requestedSlug)) {
-      return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
+  if (typeof custom_slug === 'string' && custom_slug.trim().length > 0) {
+    const desired = custom_slug.trim().toLowerCase();
+    if (!slugPattern.test(desired)) {
+      return NextResponse.json({ message: 'Invalid slug' }, { status: 400 });
     }
 
-    const { data: existing, error: lookupError } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('links')
       .select('id')
-      .eq('slug', requestedSlug)
+      .eq('slug', desired)
       .maybeSingle();
 
-    if (lookupError) {
-      return NextResponse.json({ error: 'Failed to verify slug' }, { status: 500 });
+    if (checkError) {
+      return NextResponse.json({ message: 'Failed to verify slug availability' }, { status: 500 });
     }
 
     if (existing) {
-      return NextResponse.json({ error: 'Slug already exists' }, { status: 400 });
+      return NextResponse.json({ message: 'Slug already taken' }, { status: 409 });
     }
 
-    finalSlug = requestedSlug;
+    finalSlug = desired;
   } else {
     for (let attempt = 0; attempt < 10; attempt += 1) {
       const candidate = generateRandomSlug();
@@ -159,7 +98,7 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (collisionError) {
-        return NextResponse.json({ error: 'Failed to generate slug' }, { status: 500 });
+        return NextResponse.json({ message: 'Failed to generate slug' }, { status: 500 });
       }
 
       if (!collision) {
@@ -169,11 +108,11 @@ export async function POST(request: Request) {
     }
 
     if (!finalSlug) {
-      return NextResponse.json({ error: 'Failed to generate slug' }, { status: 500 });
+      return NextResponse.json({ message: 'Failed to generate slug' }, { status: 500 });
     }
   }
 
-  const accessToken = extractAccessToken(request);
+  const accessToken = getAccessToken(request);
   let userId: string | null = null;
 
   if (accessToken) {
@@ -184,8 +123,9 @@ export async function POST(request: Request) {
   }
 
   const slugToUse = finalSlug;
+
   if (!slugToUse) {
-    return NextResponse.json({ error: 'Failed to generate slug' }, { status: 500 });
+    return NextResponse.json({ message: 'Failed to generate slug' }, { status: 500 });
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -195,15 +135,15 @@ export async function POST(request: Request) {
         slug: slugToUse,
         original_url: sanitizedUrl,
         user_id: userId,
-        is_public: true,
         clicks: 0,
+        is_public: true,
       },
     ])
     .select('slug, clicks, created_at')
     .single();
 
   if (insertError || !inserted) {
-    return NextResponse.json({ error: 'Failed to create short link' }, { status: 500 });
+    return NextResponse.json({ message: 'Failed to create short link' }, { status: 500 });
   }
 
   const baseOrigin =

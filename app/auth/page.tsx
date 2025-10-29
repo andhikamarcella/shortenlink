@@ -12,22 +12,23 @@ export default function AuthPage() {
 
   function handleGoogleSignIn() {
     setAuthError(null);
-    startTransition(async () => {
-      const redirectTo = `${window.location.origin}/dashboard`;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo,
-          forceRedirect: true,
-        },
-      });
+    startTransition(() => {
+      void (async () => {
+        const redirectTo = `${window.location.origin}/dashboard`;
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+          },
+        });
 
-      if (error) {
-        setAuthError(error.message);
-        return;
-      }
+        if (error) {
+          setAuthError(error.message);
+          return;
+        }
 
-      router.push('/dashboard');
+        router.push('/dashboard');
+      })();
     });
   }
 
