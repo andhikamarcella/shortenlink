@@ -21,7 +21,7 @@ type LinkRow = {
   clicks_count: number;
 };
 
-const shortBase = process.env.NEXT_PUBLIC_BASE_URL ?? '';
+const shortBase = (process.env.NEXT_PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
 
 const formatTimestamp = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', {

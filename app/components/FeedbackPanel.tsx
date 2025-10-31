@@ -1,10 +1,10 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import clsx from 'clsx';
 
 import { moderatorEmails } from '@/lib/isModerator';
+import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser';
 
 type FeedbackMessage = {
   id: string;
@@ -29,7 +29,7 @@ const formatTimestamp = (iso: string) =>
   });
 
 export function FeedbackPanel({ userId, email }: FeedbackPanelProps) {
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [messages, setMessages] = useState<FeedbackMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);

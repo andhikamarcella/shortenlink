@@ -109,14 +109,13 @@ export async function POST(req: Request) {
 
     console.error('[shorten] insert error:', error.message);
 
-    return NextResponse.json(
-      { success: false, error: 'Failed to create short link.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 
+  const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
   return NextResponse.json(
-    { success: true, slug, custom: isCustomSlug },
+    { success: true, slug, custom: isCustomSlug, shortUrl: `${baseUrl}/${slug}` },
     { status: 201 }
   );
 }

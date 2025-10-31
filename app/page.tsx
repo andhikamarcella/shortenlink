@@ -175,9 +175,14 @@ export default function HomePage() {
         body: JSON.stringify(payload),
       });
 
-      let body: { success?: boolean; error?: string; slug?: string } = {};
+      let body: { success?: boolean; error?: string; slug?: string; shortUrl?: string } = {};
       try {
-        body = (await response.json()) as { success?: boolean; error?: string; slug?: string };
+        body = (await response.json()) as {
+          success?: boolean;
+          error?: string;
+          slug?: string;
+          shortUrl?: string;
+        };
       } catch {
         body = {};
       }
@@ -193,9 +198,9 @@ export default function HomePage() {
         return;
       }
 
-      const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin).replace(/\/$/, '');
       const finalSlug = body.slug ?? slugToUse;
-      const shortUrl = `${baseUrl}/${finalSlug}`;
+      const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin).replace(/\/$/, '');
+      const shortUrl = (body.shortUrl ?? '').replace(/\/$/, '') || `${baseUrl}/${finalSlug}`;
 
       setResult({ shortUrl, slug: finalSlug, url: sanitizedUrl });
       setStatusMessage('Success! Your link is ready.');

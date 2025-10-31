@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import {
   Area,
   AreaChart,
@@ -13,7 +12,9 @@ import {
   CartesianGrid,
 } from 'recharts';
 
-const shortBase = process.env.NEXT_PUBLIC_BASE_URL ?? '';
+import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser';
+
+const shortBase = (process.env.NEXT_PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
 
 const buildShortUrl = (slug: string) => {
   if (shortBase) return `${shortBase}/${slug}`;
@@ -69,7 +70,7 @@ const formatDateLabel = (isoDate: string) => {
 };
 
 export function AnalyticsClient({ user }: { user: AnalyticsUser }) {
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const params = useSearchParams();
   const selectedSlug = params.get('slug');
 

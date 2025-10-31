@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser'
+import { ThemeToggle } from './ThemeToggle'
 
 export default function Navbar() {
   const router = useRouter()
@@ -78,6 +79,7 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-4 text-xs text-white/60">
+          <ThemeToggle />
           <span className="hidden select-none sm:inline-block">Version 1.0 alpha</span>
           {isLoggedIn && !loadingSession && (
             <button

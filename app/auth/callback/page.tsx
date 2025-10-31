@@ -7,22 +7,36 @@ import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
-
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      router.replace('/dashboard')
+    }, 2000)
+
     const syncSession = async () => {
       const { data, error } = await supabase.auth.getSession()
 
       if (!error && data?.session) {
+        clearTimeout(timer)
         router.replace('/dashboard')
         return
       }
-
-      router.replace('/auth')
     }
 
     void syncSession()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        clearTimeout(timer)
+        router.replace('/dashboard')
+      }
+    })
+
+    return () => {
+      clearTimeout(timer)
+      authListener?.subscription.unsubscribe()
+    }
   }, [router, supabase])
 
   return (
@@ -32,9 +46,3 @@ export default function AuthCallbackPage() {
   )
 }
 
-//
-// Notes:
-// - The Supabase auth helper persists the session via cookies. We simply read it
-//   and redirect once it becomes available. If the session is missing we return
-//   users to the auth screen so they can retry the flow.
-//
