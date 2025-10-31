@@ -30,7 +30,8 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     return new Response('Not found', { status: 404 });
   }
 
-  const destination = data.destination_url ?? data.url ?? null;
+  const { clicks_count: rawClicks = 0, destination_url, url } = data;
+  const destination = destination_url ?? url ?? null;
 
   if (!destination) {
     return new Response('Not found', { status: 404 });
@@ -44,7 +45,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
       adminClient.from('clicks').insert({ slug, country }),
       adminClient
         .from('links')
-        .update({ clicks_count: (data.clicks_count ?? 0) + 1 })
+        .update({ clicks_count: rawClicks + 1 })
         .eq('slug', slug),
     ]);
 
