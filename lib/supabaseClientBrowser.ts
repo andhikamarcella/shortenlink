@@ -1,11 +1,11 @@
 'use client'
 
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 
 import type { Database } from './types'
 
-export const createSupabaseBrowserClient = () =>
-  createBrowserClient<Database>(
+export function createSupabaseBrowserClient() {
+  return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -16,12 +16,11 @@ export const createSupabaseBrowserClient = () =>
       },
     }
   )
+}
 
 //
 // Notes:
-// - This helper returns a new Supabase browser client configured to persist
-//   OAuth sessions in local storage/cookies so callbacks work reliably in the
-//   App Router environment.
-// - Call this inside client components (e.g. with useMemo) to avoid creating a
-//   fresh instance on every render.
+// - This helper returns a Supabase client configured for browser environments.
+// - Instantiate it inside client components (e.g. with useMemo) to reuse the
+//   connection while keeping OAuth sessions in sync with Supabase callbacks.
 //
