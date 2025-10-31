@@ -57,35 +57,35 @@ export default function Navbar() {
   }
 
   return (
-    <header className="border-b border-white/10 bg-[#0d1326]/80 text-white backdrop-blur-sm">
+    <header className="w-full border-b border-gray-200 bg-white text-gray-900 transition-colors duration-300 dark:border-gray-800 dark:bg-[#0a0a0a] dark:text-gray-100">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-6">
-          <Link href="/" className="text-lg font-semibold text-white">
+          <Link href="/" className="text-lg font-bold transition-opacity hover:opacity-80">
             shortly
           </Link>
           {isLoggedIn && (
-            <nav className="hidden items-center gap-4 text-sm text-white/80 md:flex">
-              <Link href="/dashboard" className="transition hover:text-white">
+            <nav className="hidden items-center gap-4 text-sm text-gray-600 transition-colors duration-200 dark:text-gray-300 md:flex">
+              <Link href="/dashboard" className="hover:opacity-80">
                 Dashboard
               </Link>
-              <Link href="/explore" className="transition hover:text-white">
+              <Link href="/explore" className="hover:opacity-80">
                 Analytics
               </Link>
-              <Link href="/feedback" className="transition hover:text-white">
+              <Link href="/feedback" className="hover:opacity-80">
                 Feedback
               </Link>
             </nav>
           )}
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-white/60">
+        <div className="flex items-center gap-4 text-xs text-gray-600 transition-colors duration-300 dark:text-gray-300">
           <ThemeToggle />
           <span className="hidden select-none sm:inline-block">Version 1.0 alpha</span>
           {isLoggedIn && !loadingSession && (
             <button
               onClick={handleSignOut}
               disabled={signingOut}
-              className="rounded-lg bg-white/10 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/20 disabled:opacity-60"
+              className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-medium text-white transition-colors duration-200 hover:bg-gray-700 disabled:opacity-60 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200"
             >
               {signingOut ? 'Signing out…' : 'Sign out'}
             </button>

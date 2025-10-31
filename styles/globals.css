@@ -10,8 +10,10 @@
   color-scheme: dark;
 }
 
-body {
-  @apply bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900 antialiased dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100;
+@layer base {
+  body {
+    @apply bg-white text-gray-900 transition-colors duration-300 antialiased dark:bg-[#0a0a0a] dark:text-gray-100;
+  }
 }
 
 a {
