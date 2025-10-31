@@ -31,31 +31,13 @@ export default function RootLayout({
                 <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100 focus-ring">
                   shortly
                 </Link>
-                <nav className="flex items-center gap-4 text-sm font-medium text-slate-600 dark:text-slate-300">
-                  <Link href="/explore" className="focus-ring rounded-md px-2 py-1 hover:text-primary-600 dark:hover:text-primary-400">
-                    Explore
-                  </Link>
-                  <Link href="/dashboard" className="focus-ring rounded-md px-2 py-1 hover:text-primary-600 dark:hover:text-primary-400">
-                    Dashboard
-                  </Link>
-                  <ThemeToggle />
-                </nav>
+                <ThemeToggle />
               </div>
             </header>
             <main className="flex-1">{children}</main>
             <footer className="border-t border-slate-200/70 bg-white/80 py-6 text-sm text-slate-500 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/80 dark:text-slate-400">
-              <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-4 sm:flex-row">
-                <p>
-                  Built with ❤️ for the web. © {new Date().getFullYear()} shortly
-                </p>
-                <div className="flex gap-4">
-                  <Link href="/explore" className="focus-ring rounded-md px-2 py-1">
-                    Popular links
-                  </Link>
-                  <Link href="/stats/demo" className="focus-ring rounded-md px-2 py-1">
-                    Example stats
-                  </Link>
-                </div>
+              <div className="mx-auto flex w-full max-w-6xl items-center justify-center px-4">
+                <p>Built with ❤️ for the web. © {new Date().getFullYear()} shortly</p>
               </div>
             </footer>
           </div>

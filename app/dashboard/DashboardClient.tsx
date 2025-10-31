@@ -2,10 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 import { FeedbackPanel } from '@/app/components/FeedbackPanel';
 import { slugPattern } from '@/lib/slug';
+import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser';
 
 type DashboardUser = {
   id: string;
@@ -41,7 +41,7 @@ const buildShortUrl = (slug: string) => {
 };
 
 export function DashboardClient({ user }: { user: DashboardUser }) {
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
 
   const [links, setLinks] = useState<LinkRow[]>([]);

@@ -1,10 +1,10 @@
 'use client'
 
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import Navbar from '@/components/Navbar'
-import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
+import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser'
 
 type FeedbackRow = {
   id: string
@@ -34,6 +34,7 @@ const isModerator = (email: string | null | undefined) => email === 'andhikamarc
 export default function FeedbackPage() {
   const router = useRouter()
   const mountedRef = useRef(true)
+  const supabase = useMemo(() => createSupabaseBrowserClient(), [])
 
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null)
   const [modView, setModView] = useState(false)
@@ -44,12 +45,44 @@ export default function FeedbackPage() {
   const [messageText, setMessageText] = useState('')
   const [sending, setSending] = useState(false)
 
+  const fetchMessages = useCallback(
+    async (userId: string, moderator: boolean) => {
+      setLoadingMessages(true)
+      setError(null)
+
+      let query = supabase
+        .from('feedback')
+        .select('id, user_id, email, message, created_at')
+        .order('created_at', { ascending: false })
+
+      if (!moderator) {
+        query = query.eq('user_id', userId)
+      }
+
+      const { data, error } = await query
+
+      if (!mountedRef.current) return
+
+      if (error) {
+        console.error('[feedback] failed to load messages:', error.message)
+        setError('Failed to load feedback.')
+        setMessages([])
+      } else {
+        setError(null)
+        setMessages(data ?? [])
+      }
+
+      setLoadingMessages(false)
+    },
+    [supabase]
+  )
+
   useEffect(() => {
     mountedRef.current = true
 
     const loadSession = async () => {
       setLoadingSession(true)
-      const { data, error } = await supabaseBrowser.auth.getSession()
+      const { data, error } = await supabase.auth.getSession()
 
       if (!mountedRef.current) return
 
@@ -71,7 +104,7 @@ export default function FeedbackPage() {
       void fetchMessages(currentUser.id, moderator)
     }
 
-    const { data: authListener } = supabaseBrowser.auth.onAuthStateChange((event, data) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, data) => {
       if (!mountedRef.current) return
       if (event === 'SIGNED_OUT') {
         setSessionUser(null)
@@ -97,36 +130,7 @@ export default function FeedbackPage() {
       mountedRef.current = false
       authListener?.subscription.unsubscribe()
     }
-  }, [router])
-
-  const fetchMessages = async (userId: string, moderator: boolean) => {
-    setLoadingMessages(true)
-    setError(null)
-
-    let query = supabaseBrowser
-      .from('feedback')
-      .select('id, user_id, email, message, created_at')
-      .order('created_at', { ascending: false })
-
-    if (!moderator) {
-      query = query.eq('user_id', userId)
-    }
-
-    const { data, error } = await query
-
-    if (!mountedRef.current) return
-
-    if (error) {
-      console.error('[feedback] failed to load messages:', error.message)
-      setError('Failed to load feedback.')
-      setMessages([])
-    } else {
-      setError(null)
-      setMessages(data ?? [])
-    }
-
-    setLoadingMessages(false)
-  }
+  }, [fetchMessages, router, supabase])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -143,7 +147,7 @@ export default function FeedbackPage() {
 
     setSending(true)
 
-    const { error } = await supabaseBrowser.from('feedback').insert({
+    const { error } = await supabase.from('feedback').insert({
       user_id: sessionUser.id,
       email: sessionUser.email,
       message: trimmed,

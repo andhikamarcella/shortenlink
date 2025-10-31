@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
+
+import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
 
+  const supabase = useMemo(() => createSupabaseBrowserClient(), [])
+
   useEffect(() => {
     const syncSession = async () => {
-      const { data, error } = await supabaseBrowser.auth.getSession()
+      const { data, error } = await supabase.auth.getSession()
 
       if (!error && data?.session) {
         router.replace('/dashboard')
@@ -20,7 +23,7 @@ export default function AuthCallbackPage() {
     }
 
     void syncSession()
-  }, [router])
+  }, [router, supabase])
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-black text-white">

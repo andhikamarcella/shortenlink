@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
+import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser'
 
 export default function Navbar() {
   const router = useRouter()
@@ -12,18 +12,20 @@ export default function Navbar() {
   const [loadingSession, setLoadingSession] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
 
+  const supabase = useMemo(() => createSupabaseBrowserClient(), [])
+
   useEffect(() => {
     let isMounted = true
 
     const loadSession = async () => {
       setLoadingSession(true)
-      const { data } = await supabaseBrowser.auth.getSession()
+      const { data } = await supabase.auth.getSession()
       if (!isMounted) return
       setSession(data.session ?? null)
       setLoadingSession(false)
     }
 
-    const { data: subscription } = supabaseBrowser.auth.onAuthStateChange((_, currentSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((_, currentSession) => {
       if (!isMounted) return
       setSession(currentSession)
     })
@@ -34,7 +36,7 @@ export default function Navbar() {
       isMounted = false
       subscription?.subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase])
 
   const isLoggedIn = !!session
 
@@ -42,7 +44,7 @@ export default function Navbar() {
     if (signingOut) return
     setSigningOut(true)
 
-    const { error } = await supabaseBrowser.auth.signOut()
+    const { error } = await supabase.auth.signOut()
     if (error) {
       console.error('[navbar] failed to sign out:', error.message)
       setSigningOut(false)

@@ -1,15 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { supabaseBrowser } from '@/lib/supabaseClientBrowser'
+import { useMemo, useState } from 'react'
+
+import { createSupabaseBrowserClient } from '@/lib/supabaseClientBrowser'
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false)
 
+  const supabase = useMemo(() => createSupabaseBrowserClient(), [])
+
   const handleLogin = async () => {
     setLoading(true)
 
-    const { error } = await supabaseBrowser.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo:
